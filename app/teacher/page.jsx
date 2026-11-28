@@ -588,6 +588,44 @@ function Icon({
   );
 }
 
+const SCOPED_TEACHER_MUTATIONS = new Set([
+  "add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year",
+  "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section",
+  "archive_class", "import_class_archive", "restore_learner_archives", "restore_class_archive", "purge_class_archives",
+]);
+
+async function requestTeacherAssessment(action, { method = "GET", body, query } = {}) {
+  const search = new URLSearchParams({ action });
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
+  }
+  const response = await fetch(`/api/assessment?${search}`, {
+    method,
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
+    },
+    body: method !== "GET" ? JSON.stringify({ action, ...body }) : undefined,
+  });
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error(await response.text() || "The server returned an invalid response.");
+  }
+  const data = await response.json();
+  if (!response.ok) {
+    throw Object.assign(new Error(data.error || `Request failed with status ${response.status}.`), {
+      status: response.status, code: data.code,
+    });
+  }
+  if (data?.serverNow && !data.serverReceivedAt) data.serverReceivedAt = Date.now();
+  return data;
+}
+
+function keepUnchangedRoster(current, incoming) {
+  return JSON.stringify(current) === JSON.stringify(incoming) ? current : incoming;
+}
+
 export default function TeacherPage() {
   useStaffSignOut('teacher', '/login');
   const router = useRouter();
@@ -1091,82 +1129,16 @@ export default function TeacherPage() {
     []
   );
 
-  const api = useCallback(
-    async (
-      action,
-      {
-        method = "GET",
-        body = undefined,
-        query = undefined,
-      } = {}
-    ) => {
-      const search = new URLSearchParams({ action });
-      Object.entries(query || {}).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          search.set(key, String(value));
-        }
-      });
-      const url = `/api/assessment?${search.toString()}`;
-
-      const response =
-        await fetch(url, {
-          method,
-          credentials:
-            "include",
-          cache: "no-store",
-          headers: {
-            Accept:
-              "application/json",
-            ...(method !== "GET"
-              ? {
-                  "Content-Type":
-                    "application/json",
-                }
-              : {}),
-          },
-          body:
-            method !== "GET"
-              ? JSON.stringify({
-                  action,
-                  ...(body || {}),
-                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive", "restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) ? { class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId, roster_version: Object.hasOwn(body || {}, "roster_version") ? body.roster_version : classCatalog.roster_version ?? 0 } : {}),
-                })
-              : undefined,
-        });
-
-      const contentType =
-        response.headers.get(
-          "content-type"
-        ) || "";
-
-      let data;
-
-      if (
-        contentType.includes(
-          "application/json"
-        )
-      ) {
-        data =
-          await response.json();
-      } else {
-        const text =
-          await response.text();
-
-        throw new Error(
-          text ||
-            "The server returned an invalid response."
-        );
-      }
-
-      if (!response.ok) {
-        throw Object.assign(new Error(data.error || `Request failed with status ${response.status}.`), {status:response.status,code:data.code});
-      }
-
-      if (data?.serverNow && !data.serverReceivedAt) data.serverReceivedAt = Date.now();
-      return data;
-    },
-    [selectedSectionId, classCatalog.roster_version]
-  );
+  const api = useCallback((action, { method = "GET", body, query } = {}) => {
+    if (method !== "GET" && SCOPED_TEACHER_MUTATIONS.has(action)) {
+      body = {
+        ...body,
+        class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId,
+        roster_version: Object.hasOwn(body || {}, "roster_version") ? body.roster_version : classCatalog.roster_version ?? 0,
+      };
+    }
+    return requestTeacherAssessment(action, { method, body, query });
+  }, [selectedSectionId, classCatalog.roster_version]);
 
   const applyClassCatalog = useCallback((incoming) => {
     setClassCatalog(current => {
@@ -1368,16 +1340,16 @@ export default function TeacherPage() {
             classesData,
           ] =
             await Promise.all([
-              api(
+              requestTeacherAssessment(
                 "get_learners"
               ),
-              api(
+              requestTeacherAssessment(
                 "get_assessments"
               ),
-              api(
+              requestTeacherAssessment(
                 "get_activities"
               ),
-              api("get_classes"),
+              requestTeacherAssessment("get_classes"),
             ]);
 
           applyClassCatalog(classesData);
@@ -1414,7 +1386,7 @@ export default function TeacherPage() {
               ? assessmentsData.assessments
               : [];
 
-          setLearners(
+          const nextLearners =
             learnerPayload.filter(Boolean).map(
               (learner) => ({
                 ...learner,
@@ -1428,12 +1400,10 @@ export default function TeacherPage() {
                   learner.LRN ??
                   "",
               })
-            )
-          );
-
-          setAssessments(
-            assessmentPayload.filter(Boolean)
-          );
+            );
+          setLearners(current => keepUnchangedRoster(current, nextLearners));
+          const nextAssessments = assessmentPayload.filter(Boolean);
+          setAssessments(current => keepUnchangedRoster(current, nextAssessments));
 
           if (activitiesData?.activities) {
             applyRemoteActivities(
@@ -1479,7 +1449,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, applyClassCatalog, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast, user?.id]
+      [applyClassCatalog, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast, user?.id]
     );
 
   useEffect(() => {
@@ -1488,9 +1458,9 @@ export default function TeacherPage() {
         // The roster and selected class are still mounted and fully loaded.
         // Refresh only completion statuses after a final save; offline
         // responses come from the local-first assessment record snapshot.
-        void api("get_assessments").then((data) => {
+        void requestTeacherAssessment("get_assessments").then((data) => {
           if (Array.isArray(data?.assessments)) {
-            setAssessments(data.assessments.filter(Boolean));
+            setAssessments(current => keepUnchangedRoster(current, data.assessments.filter(Boolean)));
           }
         }).catch((error) => {
           console.warn("Assessment status refresh will retry:", error?.message || error);
@@ -1511,7 +1481,7 @@ export default function TeacherPage() {
         refreshAfterOfflineSync
       );
     };
-  }, [loadData, api]);
+  }, [loadData]);
 
   /*
    * Fetch the offline assessment screen while there is a network.
@@ -1589,12 +1559,13 @@ export default function TeacherPage() {
 
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && user?.id) {
       loadData();
     }
   }, [
     loading,
     loadData,
+    user?.id,
   ]);
 
   useEffect(() => {
@@ -2160,10 +2131,19 @@ export default function TeacherPage() {
   const analyticsPeriodResults = analyticsSelectedLearner
     ? learnerPeriodResults.get(String(analyticsSelectedLearner.id))
     : undefined;
+  const analyticsResultScope = JSON.stringify([
+    analyticsLearnerSectionId,
+    analyticsSelectedLearner?.id,
+    ...PERIODS.flatMap(period => {
+      const result = analyticsPeriodResults?.[period];
+      return result?.is_completed ? [[period, result.id, Boolean(result.offline_pending)]] : [];
+    }),
+  ]);
   const analyticsPeriodDetails = PERIODS.map(period => {
     const result = analyticsPeriodResults?.[period];
-    const entry = analyticsDetailsById[String(result?.id)];
-    return { period, result, detail: entry?.detail, error: entry?.error, loading: Boolean(result?.is_completed && !entry) };
+    const entry = analyticsDetailsById[JSON.stringify([analyticsLearnerSectionId, analyticsSelectedLearner?.id, period, result?.id, Boolean(result?.offline_pending)])];
+    const detail = entry?.detail ?? result?.analytics_detail;
+    return { period, result, detail, error: detail ? undefined : entry?.error, loading: Boolean(result?.is_completed && !entry && !detail) };
   });
 
   const changeAnalyticsClass = useCallback((yearId, sectionId) => {
@@ -2249,26 +2229,25 @@ export default function TeacherPage() {
   }, [analyticsLearnerId, analyticsLearnerOptions, selectAnalyticsLearner]);
 
   useEffect(() => {
-    if (!analyticsMobileResultOpen || !analyticsPeriodResults) return;
+    if (!analyticsMobileResultOpen) {
+      setAnalyticsDetailsById(current => Object.keys(current).length ? {} : current);
+      return;
+    }
+    const [sectionId, learnerId, ...periods] = JSON.parse(analyticsResultScope);
+    if (sectionId == null || learnerId == null) return;
     let cancelled = false;
-    setAnalyticsDetailsById({});
-    for (const result of Object.values(analyticsPeriodResults)) {
-      if (!result.is_completed) continue;
-      const id = String(result.id);
+    for (const [period, assessmentId, offlinePending] of periods) {
+      const key = JSON.stringify([sectionId, learnerId, period, assessmentId, offlinePending]);
       const save = entry => {
-        if (!cancelled) setAnalyticsDetailsById(current => ({ ...current, [id]: entry }));
+        if (!cancelled) setAnalyticsDetailsById(current => ({ ...current, [key]: entry }));
       };
-      if (result.analytics_detail) {
-        save({ detail: { ...result, ...result.analytics_detail } });
-        continue;
-      }
-      api("get_assessment_detail", {
-        query: { assessment_id: result.id, class_section_id: analyticsLearnerSectionId },
+      requestTeacherAssessment("get_assessment_detail", {
+        query: { assessment_id: assessmentId, class_section_id: sectionId },
       }).then(data => {
         const detail = data?.assessment || data;
-        if (String(detail?.id) !== id ||
-          String(detail.learner_id) !== String(result.learner_id) ||
-          detail.assessment_period !== result.assessment_period) {
+        if (String(detail?.id) !== String(assessmentId) ||
+          String(detail.learner_id) !== String(learnerId) ||
+          detail.assessment_period !== period) {
           save({ error: "Unable to match the saved result to this learner and period." });
           return;
         }
@@ -2276,7 +2255,7 @@ export default function TeacherPage() {
       }).catch(error => save({ error: error?.message || "Unable to load this result." }));
     }
     return () => { cancelled = true; };
-  }, [analyticsMobileResultOpen, analyticsPeriodResults, analyticsLearnerSectionId, api]);
+  }, [analyticsMobileResultOpen, analyticsResultScope]);
 
   const exportAssessmentRecord =
     useCallback(
@@ -2385,7 +2364,18 @@ export default function TeacherPage() {
       ]
     );
 
-  useEffect(()=>{if(bentoOpen&&activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)applyClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[api,applyClassCatalog,bentoOpen,activeTab]);
+  useEffect(() => {
+    if (loading || offlineAssessment || (bentoOpen && activeTab !== "conduct")) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      if (document.hidden || dashboardRefreshStateRef.current.inFlight ||
+          Date.now() - dashboardRefreshStateRef.current.lastStart < 15000) return;
+      void requestTeacherAssessment("get_classes").then(catalog => {
+        if (!cancelled) applyClassCatalog(catalog);
+      }).catch(() => {});
+    }, 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [loading, offlineAssessment, applyClassCatalog, bentoOpen, activeTab]);
 
   const liveTimelineIssue = period => {
     const authority=classCatalog.assessmentAuthorities?.find(w=>w.schoolYearId===selectedClass?.schoolYearId&&w.period===period);
@@ -2944,6 +2934,7 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
+      if (document.querySelector("[data-crl-class-dialog]")) return;
       if (storyClosePrompt) {
         setStoryClosePrompt(null);
       } else if (reportsView !== null) {
@@ -4453,7 +4444,7 @@ export default function TeacherPage() {
             background 0.16s ease;
         }
 
-        table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
+        table:where(:not(.recordTemplateTable):not(.scoresheetGrid):not(.learnerComparisonTable)) tbody tr:hover td {
           background: #fafafa;
         }
 
@@ -7331,7 +7322,7 @@ export default function TeacherPage() {
           border-color: #2a3a55;
         }
 
-        html[data-crl-theme="dark"] table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
+        html[data-crl-theme="dark"] table:where(:not(.recordTemplateTable):not(.scoresheetGrid):not(.learnerComparisonTable)) tbody tr:hover td {
           background: #1f2a3c;
         }
 
@@ -9891,7 +9882,7 @@ export default function TeacherPage() {
           color: #6b7789 !important;
         }
 
-        html:not([data-crl-theme="dark"]) table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
+        html:not([data-crl-theme="dark"]) table:where(:not(.recordTemplateTable):not(.scoresheetGrid):not(.learnerComparisonTable)) tbody tr:hover td {
           background: #fafafa !important;
         }/* ---------- status pills -> text badges ---------- */
         html[data-crl-theme] .badge {
@@ -10294,7 +10285,7 @@ export default function TeacherPage() {
           color: var(--crl-muted) !important;
         }
 
-        html[data-crl-theme] table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
+        html[data-crl-theme] table:where(:not(.recordTemplateTable):not(.scoresheetGrid):not(.learnerComparisonTable)) tbody tr:hover td {
           background: var(--crl-hover) !important;
         }
 
@@ -10777,34 +10768,6 @@ export default function TeacherPage() {
           border-bottom-style: solid !important;
           border-radius: 0 !important;
           font-size: 12px !important;
-        }
-
-        /* View / Delete as plain text links */
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton {
-          border-bottom-color: transparent !important;
-          background: transparent !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
-          border-bottom-color: #1a2b4c !important;
-          background: transparent !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton.redSmall {
-          color: #c0392b !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton.redSmall:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
-          border-bottom-color: #c0392b !important;
-        }/* status badge (No Assessment / BoSY / MoSY / EoSY) as a text badge */
-        html[data-crl-theme] .learnerRoster .badge {
-          border-width: 0 !important;
-          border-radius: 0 !important;
-          padding: 0 0 2px !important;
-          border-bottom-width: 2px !important;
-          border-bottom-style: solid !important;
-          font-size: 11px !important;
-          font-weight: 800 !important;
         }
 
         /* status badge (No Assessment / BoSY / MoSY / EoSY) as a text badge */
@@ -12317,25 +12280,52 @@ export default function TeacherPage() {
         .conductRosterHeading{text-align:center;overflow-wrap:anywhere}
         .conductClassContext{font-size:16px;gap:3px;margin-bottom:5px;line-height:1.35}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
         .learnerRoster { overflow-x:auto; overscroll-behavior-inline:contain; isolation:isolate; margin:16px; }
-        .learnerRoster table { width:100%!important; min-width:700px!important; table-layout:fixed; border-collapse:separate; border-spacing:0; }
-        .learnerRoster :is(th,td) { padding:12px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
-        .learnerRoster .rosterIdentity { position:sticky; left:0; z-index:1; width:clamp(150px, 31vw, 250px); padding:12px; background:var(--crl-surface); box-shadow:1px 0 var(--crl-line); }
-        .learnerRoster thead .rosterIdentity { background:var(--crl-surface-2); }
-        .learnerRoster .rosterIdentityHeader,.learnerRoster .rosterLearner { display:flex; align-items:center; gap:8px; }
-        .learnerRoster .rosterLearner input,.learnerRoster .rosterIdentityHeader input { flex:none; margin:0; }
-        .learnerRoster .rosterLearnerDetails { min-width:0; display:grid; gap:4px; }
-        .learnerRoster .rosterLearnerDetails small,.learnerRoster .rosterPeriod > span { color:var(--crl-muted); font-size:13px; }
-        .learnerRoster .rosterPeriod .badge { display:block; width:fit-content; margin-top:8px; white-space:normal; }
-        .learnerRoster .inlineActions { margin-top:8px; gap:6px; }
+        html[data-crl-theme] .learnerRoster table {
+          width:100%!important;
+          max-width:960px;
+          min-width:505px!important;
+          margin-inline:auto;
+          table-layout:fixed;
+          border-collapse:separate!important;
+          border-spacing:0;
+        }
+        html[data-crl-theme] .learnerRoster :is(th,td) {
+          padding:10px 12px!important;
+          white-space:normal;
+          vertical-align:middle;
+        }
+        html[data-crl-theme] .learnerRoster thead th { text-align:center; background:var(--crl-surface-2)!important; }
+        html[data-crl-theme] .learnerRoster .rosterIdentity {
+          position:sticky; left:0; z-index:1; width:285px;
+          background:var(--crl-surface)!important; box-shadow:1px 0 var(--crl-line);
+        }
+        html[data-crl-theme] .learnerRoster thead .rosterIdentity { background:var(--crl-surface-2)!important; }
+        .rosterLearner { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; text-align:left; }
+        .rosterLearner input { margin:0; }
+        .rosterLearnerDetails { min-width:0; display:grid; gap:4px; text-transform:none; letter-spacing:normal; overflow-wrap:anywhere; }
+        .rosterLearnerDetails strong { line-height:1.35; }
+        .rosterLearnerDetails small,.rosterPeriodStatus { color:var(--crl-muted); font-size:13px; font-weight:500; }
+        .rosterPeriodContent { display:grid; justify-items:center; gap:5px; text-align:center; overflow-wrap:anywhere; }
+        .rosterPeriodContent .badge { max-width:100%; white-space:normal; line-height:1.35; }
+        .rosterLearner .inlineActions { display:grid; gap:5px; margin:0; }
         .learnerRoster:focus-visible { outline:2px solid var(--crl-active-bg,#3978b5); outline-offset:3px; }
-        html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:68px;padding:10px 14px!important;font:700 14px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
+        html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:60px;padding:7px 10px!important;font:700 13px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.primary{background:#287c55!important;border-color:#287c55!important;color:#fff!important}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#e9f2ff!important;border-color:#a8c4e9!important;color:#24568c!important}
         html[data-crl-theme="dark"] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#24384e!important;color:#c8ddff!important;border-color:#42618a!important}
-
+        @media (hover:hover) and (pointer:fine) {
+          html[data-crl-theme] .learnerRoster .inlineActions .smallButton:not(:disabled):hover { filter:brightness(.92); }
+        }
         @media(max-width:640px){
           .learnerRoster { margin:10px; }
-          html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:0; padding:8px!important; flex:1; }
+          html[data-crl-theme] .learnerRoster .rosterIdentity { width:clamp(156px,48vw,235px); }
+          html[data-crl-theme] .learnerRoster :is(th,td) { padding:8px!important; }
+          .rosterLearner { grid-template-columns:minmax(0,1fr) auto; gap:4px 6px; font-size:12px; }
+          .rosterLearner input { grid-column:1; }
+          .rosterLearnerDetails { grid-column:1; gap:2px; }
+          .rosterLearnerDetails small,.rosterPeriodStatus { font-size:11px; }
+          .rosterLearner .inlineActions { grid-area:1 / 2 / span 2; }
+          html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:44px; padding:6px!important; font-size:12px!important; }
         }
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])){background:var(--crl-surface-2)}}
@@ -12603,7 +12593,6 @@ export default function TeacherPage() {
                     className={
                       "panel conductLearnerPanel" +
                       (learnersLoaded &&
-                      !loadingData &&
                       filteredLearners.length === 0
                         ? " conductLearnerPanelEmpty"
                         : "")
@@ -12642,7 +12631,7 @@ export default function TeacherPage() {
 
                     <TeacherOfflineSettings offline={isOffline} />
 
-                    {learnersLoaded && !loadingData && (
+                    {learnersLoaded && (
                     <div className="toolbar conductFilters">
                       <input
                         className="searchInput"
@@ -12754,7 +12743,7 @@ export default function TeacherPage() {
                     </div>
                     )}
 
-                    {!learnersLoaded || loadingData ? (
+                    {!learnersLoaded ? (
                       <WorkspaceLoading label="Loading enrolled learners…" variant="roster-rows"/>
                     ) : filteredLearners.length === 0 ? (
                       <div className="emptyState learnerEmptyState">
@@ -12775,17 +12764,7 @@ export default function TeacherPage() {
                           <table>
                             <thead>
                               <tr>
-                                <th scope="col" className="rosterIdentity">
-                                  <div className="rosterIdentityHeader">
-                                    <input
-                                      type="checkbox"
-                                      aria-label="Select all visible learners"
-                                      checked={filteredLearners.every(learner => selectedLearnerIds.includes(Number(learner.id)))}
-                                      onChange={event => event.target.checked ? selectAllFilteredLearners() : clearLearnerSelection()}
-                                    />
-                                    Learner
-                                  </div>
-                                </th>
+                                <th scope="col" className="rosterIdentity">Learner</th>
                                 {PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}
                               </tr>
                             </thead>
@@ -12806,10 +12785,10 @@ export default function TeacherPage() {
                                         <input type="checkbox" aria-label={`Select ${name}`} checked={selected} onChange={() => toggleLearnerSelection(learner.id)} />
                                         <div className="rosterLearnerDetails">
                                           <strong>{name}</strong>
-                                          <small>LRN {learner.lrn}{learner.sex && ` · ${learner.sex}`}</small>
+                                          <small>LRN: {learner.lrn}</small>
+                                          {learner.sex && <small>Sex: {learner.sex}</small>}
                                         </div>
-                                      </div>
-                                      <div className="inlineActions">
+                                        <div className="inlineActions">
                                         <button type="button" className="smallButton learnerViewButton" onClick={() => {
                                           setAnalyticsYearId(selectedClass.schoolYearId);
                                           setAnalyticsSectionId(selectedClass.id);
@@ -12817,6 +12796,7 @@ export default function TeacherPage() {
                                           setAnalyticsMobileResultOpen(true);
                                         }}>View</button>
                                         <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period => Boolean(liveTimelineIssue(period) || periodEligibility(assessments, learner.id, period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
+                                        </div>
                                       </div>
                                     </th>
                                     {PERIODS.map(period => {
@@ -12824,8 +12804,10 @@ export default function TeacherPage() {
                                       const profile = learnerPeriodProfile(result);
                                       return (
                                         <td key={period} className="rosterPeriod">
-                                          <span>{learnerPeriodStatus(result)}</span>
-                                          {profile && <strong className={`badge ${profileClass(profile)}`}>{profile}</strong>}
+                                          <div className="rosterPeriodContent">
+                                            <span className="rosterPeriodStatus">{learnerPeriodStatus(result)}</span>
+                                            {profile && <strong className={`badge ${profileClass(profile)}`}>{profile}</strong>}
+                                          </div>
                                         </td>
                                       );
                                     })}

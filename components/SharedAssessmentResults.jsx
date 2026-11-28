@@ -2,13 +2,14 @@
 import {useEffect,useRef,useState} from 'react';
 import {downloadBlob} from '../lib/downloadFile';
 import WorkspaceLoading from './WorkspaceLoading';
+import ClassDialog from './ClassDialog';
 import {getStoryQuestions} from '../lib/storyComprehension.mjs';
 import {getPossibleStoryAnswer} from '../lib/storyAnswerGuides.mjs';
 import {formatName,getRecordProfile,hasRecordedPassageAssessment,READING_PROFILE_LABELS} from '../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../lib/profileComparison.mjs';
 import {printAssessmentElement,CLEAN_PRINT_HINT} from '../lib/printRecords';
 import {canPrintIndividualResult,buildIndividualLearnerReport,createIndividualLearnerReport,INDIVIDUAL_REPORT_PRINT_CSS} from '../lib/individualLearnerReport.mjs';
-import {countLearnerMiscues, learnerPeriodProfile, learnerPeriodStatus} from '../lib/learnerPeriodResults.mjs';
+import {compareLearnerMiscueWords, countLearnerMiscues, formatLearnerReadingTime, learnerPeriodProfile, learnerPeriodStatus} from '../lib/learnerPeriodResults.mjs';
 import './AssessmentResults.css';
 const PERIODS=["BoSY","MoSY","EoSY"];
 const PERIOD_MEANINGS = {
@@ -482,33 +483,84 @@ function LearnerAssessmentEvidence({ detail }) {
   );
 }
 
-function LearnerComparisonTable({ title, rows }) {
+function LearnerComparisonTable({ title, rows, onView }) {
   return (
-    <div className="learnerComparisonScroll" role="region" aria-label={title} tabIndex={0}>
-      <table className="learnerComparisonTable">
-        <caption>{title}</caption>
-        <thead>
-          <tr><th scope="col">Measure</th>{PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.map(([label, ...values]) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
-              {values.map((value, index) => <td key={PERIODS[index]}>{value}</td>)}
+    <section className={`learnerComparisonCard${onView ? " hasMiscueActions" : ""}`}>
+      <h3>{title}</h3>
+      <div className="learnerComparisonScroll" role="region" aria-label={title} tabIndex={0}>
+        <table role="table" className="learnerComparisonTable" aria-label={title}>
+          <thead role="rowgroup">
+            <tr role="row">
+              <td role="cell" />
+              {PERIODS.map(period => <th role="columnheader" scope="col" key={period}>{period}</th>)}
+              {onView && <td role="cell" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody role="rowgroup">
+            {rows.map(({ label, values, type }) => (
+              <tr role="row" key={label}>
+                <th role="rowheader" scope="row">{label}</th>
+                {values.map((value, index) => <td role="cell" key={PERIODS[index]}>{value}</td>)}
+                {onView && <td role="cell"><button className="learnerMiscueView" type="button" aria-label={`View ${label.toLowerCase()} details`} onClick={() => onView({ label, type })}>View</button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function LearnerMiscueComparison({ selection, entries, knownTypes, onClose }) {
+  const words = compareLearnerMiscueWords(entries, selection.type, knownTypes);
+  return (
+    <ClassDialog wide showClose nested title={`${selection.label} · Word comparison`} onClose={onClose}>
+      <div className="sharedAssessmentResults learnerMiscueDetails">
+        <p>Words are matched across passages by spelling. Positions identify each occurrence in its passage.</p>
+        {!words.length && (
+          <div className="analyticsDetailState">
+            {entries.some(entry => entry.loading) ? "Loading miscue details…" :
+              entries.some(entry => entry.passage && !entry.miscues) ? "Some miscue details are unavailable." :
+                "No miscues of this type were recorded."}
+          </div>
+        )}
+        {words.map(word => (
+          <section className="learnerMiscueWord" key={word.key}>
+            <h3>{word.label}</h3>
+            <div className="learnerMiscuePeriods">
+              {word.periods.map(({ period, title, observations, occurrences, note }) => (
+                <div key={period} className="learnerMiscuePeriod">
+                  <h4>{period}</h4>
+                  {title && <small>{title}</small>}
+                  {occurrences.length > 1 && <small>Word positions {occurrences.join(", ")}</small>}
+                  {note ? <p>{note}</p> : (
+                    <ul>
+                      {observations.map((observation, index) => (
+                        <li key={index}>
+                          <strong>{knownTypes.get(observation.type) || formatAnalyticsMiscueType(observation.originalType)}</strong>
+                          {observation.position != null && <span>Word {observation.position}</span>}
+                          {observation.misreadWord && <span>Read as “{observation.misreadWord}”</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </ClassDialog>
   );
 }
 
 function LearnerPeriodSummary({ periodResults }) {
-  const entries = PERIODS.map(period => periodResults.find(entry => entry.period === period) || {});
-  const compared = entries.map(({ result, detail, loading }) => {
-    if (!result?.is_completed) return { result };
+  const [miscueSelection, setMiscueSelection] = useState(null);
+  const compared = PERIODS.map(period => {
+    const { result, detail, loading } = periodResults.find(entry => entry.period === period) || {};
+    if (!result?.is_completed) return { period, result };
     const saved = { ...result, ...detail };
-    return { result, saved, passage: hasRecordedPassageAssessment(saved), miscues: countLearnerMiscues(saved), loading };
+    return { period, result, saved, passage: hasRecordedPassageAssessment(saved), miscues: countLearnerMiscues(saved), loading };
   });
   const score = (value, maximum) => value == null ? "Not recorded" : `${value}/${maximum}`;
   const measure = value => value ?? "Not recorded";
@@ -528,33 +580,34 @@ function LearnerPeriodSummary({ periodResults }) {
         ? ((Number(saved.words_read) / Number(saved.timer_seconds)) * 60).toFixed(2)
         : "Not recorded"
     ))],
-    ["Reading time", passageMeasure(saved => `${saved.timer_seconds} sec`)],
-    ["Total scored miscues", passageMeasure(saved => measure(saved.total_miscues))],
+    ["Reading time", passageMeasure(saved => formatLearnerReadingTime(saved.timer_seconds))],
+    ["Total miscues", passageMeasure(saved => measure(saved.total_miscues))],
   ];
   const detailKeys = new Map(Object.keys(ANALYTICS_MISCUE_PALETTE).map(label => [label.toLowerCase().replace(/[^a-z]/g, ""), label]));
   const hasOtherMiscues = compared.some(({ miscues }) => miscues && [...miscues.keys()].some(key => !detailKeys.has(key)));
-  const miscueRows = [...detailKeys].map(([key, label]) => [label, counts => counts.get(key) || 0]);
-  if (hasOtherMiscues) {
-    miscueRows.push(["Other miscues", counts =>
-      [...counts].reduce((sum, [key, count]) => sum + (detailKeys.has(key) ? 0 : count), 0)]);
-  }
+  const miscueTypes = [...detailKeys].map(([type, label]) => ({ type, label }));
+  if (hasOtherMiscues) miscueTypes.push({ type: "other", label: "Other miscues" });
   const hasPassage = compared.some(entry => entry.passage);
   return (
     <div className="learnerPeriodSummary">
-      <LearnerComparisonTable title="Reading performance by period" rows={[
-        ["Assessment status", ...compared.map(({ result }) => learnerPeriodStatus(result))],
-        ["Reading profile", ...compared.map(({ result }) => learnerPeriodProfile(result) || "—")],
-        ...metrics.map(([label, read]) => [label, ...compared.map(entry => entry.saved ? read(entry) : "—")]),
+      <LearnerComparisonTable title="Reading Performance" rows={[
+        { label: "Assessment status", values: compared.map(({ result }) => learnerPeriodStatus(result)) },
+        { label: "Reading profile", values: compared.map(({ result }) => learnerPeriodProfile(result) || "—") },
+        ...metrics.map(([label, read]) => ({ label, values: compared.map(entry => entry.saved ? read(entry) : "—") })),
       ]} />
-      {hasPassage && <LearnerComparisonTable title="Miscues by type" rows={miscueRows.map(([label, read]) => [
+      {hasPassage && <LearnerComparisonTable title="Miscues by Type" onView={setMiscueSelection} rows={miscueTypes.map(({ label, type }) => ({
         label,
-        ...compared.map(({ saved, passage, miscues, loading }) => {
+        type,
+        values: compared.map(({ saved, passage, miscues, loading }) => {
           if (!saved) return "—";
           if (!passage) return "Not administered";
           if (loading) return "Loading…";
-          return miscues ? read(miscues) : "Details unavailable";
+          if (!miscues) return "Details unavailable";
+          if (type === "other") return [...miscues].reduce((sum, [key, count]) => sum + (detailKeys.has(key) ? 0 : count), 0);
+          return miscues.get(type) || 0;
         }),
-      ])} />}
+      }))} />}
+      {miscueSelection && <LearnerMiscueComparison selection={miscueSelection} entries={compared} knownTypes={detailKeys} onClose={() => setMiscueSelection(null)} />}
     </div>
   );
 }

@@ -1,5 +1,38 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-28.2 — Roster spacing, miscue comparison and refresh stability
+
+Date: 28 November 2026, Asia/Manila.
+
+Conduct Assessment centers the Learner, BoSY, MoSY and EoSY headings and
+stacks each status above its profile. The pinned learner column now labels
+LRN and sex, displays View above Start on the right, and uses row checkboxes
+and the existing toolbar selection actions. Period columns are narrower and
+can scroll on smaller screens.
+
+The results Summary has centered Reading Performance and Miscues by Type
+headings, static rows, and elapsed time in minutes and seconds. View on a
+miscue type opens a comparison of the recorded words, categories, positions
+and read-as text for each period. Repeated spellings retain their passage
+positions. Missing evidence, missing words and words with no recorded miscue
+are distinguished. Escape and PWA Back close the nested comparison first.
+
+Workspace reads no longer restart on section selection. Quiet roster refreshes
+keep the current view mounted, and learner evidence requests follow assessment
+identity rather than changes to the roster response object. A changed assessment
+ID or offline sync state can still load updated evidence.
+
+Updated the teacher workspace, shared results styles and dialog, period
+comparison model, PWA shell v130, and regression checks. Clean install,
+the zero-finding security audit, full regression suite and production build
+passed. Chromium with synthetic records verified the layout at 320, 390, 800
+and 1440 px in light and dark themes, including horizontal roster scrolling,
+all three comparison periods on phones, stable section and background
+refreshes, word evidence, Escape and PWA Back. Separate browser confirmation
+tests covered online and offline archiving. No migration was required.
+Rollback can use the previous application release without rewriting stored
+assessment outcomes or archives.
+
 ## CRL-2026-11-28.1 — Learner period results and roster archiving
 
 Date: 28 November 2026, Asia/Manila.

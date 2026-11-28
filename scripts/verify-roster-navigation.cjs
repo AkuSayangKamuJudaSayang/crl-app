@@ -20,10 +20,11 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  assert.equal((html.match(/scope="col"/g)||[]).length,4);
  assert.equal((html.match(/scope="row"/g)||[]).length,2);
  assert.equal((html.match(/<td[ >]/g)||[]).length,6);
- for(const label of ['LRN','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Select all visible learners','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
+ for(const label of ['LRN:','Sex:','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
  assert.ok(!html.includes('Developing Reader'));
  assert.ok(!html.includes('Delete'));
- assert.match(page,/\.learnerRoster \.rosterIdentity \{ position:sticky; left:0;/);
+ assert.match(page,/\.learnerRoster \.rosterIdentity \{\s+position:sticky; left:0;/);
+ assert.doesNotMatch(html, /Select all visible learners/);
  assert.equal(periodModel.countLearnerMiscues({}),null);
  assert.equal(periodModel.countLearnerMiscues({passage_miscues:[]}).size,0);
  const miscues=periodModel.countLearnerMiscues({passage_miscues:[{miscue_type:'Last Word Read'},{miscue_type:'SelfCorrection'},{miscueType:'Self-correction'},{type:'Omission'}]});
@@ -32,16 +33,30 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  assert.equal(miscues.size,2);
  const shared=fs.readFileSync('components/SharedAssessmentResults.jsx','utf8');
  const Summary=await compile(shared.slice(shared.indexOf('function LearnerComparisonTable'),shared.indexOf('export function AnalyticsLearnerResultPanel'))+'export default LearnerPeriodSummary;',{
-  ...periodModel,...records,PERIODS:['BoSY','MoSY','EoSY'],ANALYTICS_MISCUE_PALETTE:{Omission:[],Substitution:[]},
+  ...periodModel,...records,useState:React.useState,PERIODS:['BoSY','MoSY','EoSY'],ANALYTICS_MISCUE_PALETTE:{Omission:[],Substitution:[]},
  });
  const summary=renderToStaticMarkup(React.createElement(Summary,{periodResults:[
   {period:'BoSY',result:{is_completed:true,task1_score:0,task2_score:0,timer_seconds:null}},
   {period:'MoSY',result:{is_completed:true,task1_score:9,task2_score:9,timer_seconds:60,words_read:95,comprehension_score:5,miscue_accuracy:95,total_miscues:5},detail:{passage_miscues:[{miscue_type:'Omission'},{miscue_type:'Last Word Read'}]}},
   {period:'EoSY',result:{is_completed:true,task1_score:9,task2_score:9,timer_seconds:120,words_read:80,comprehension_score:4,miscue_accuracy:80,total_miscues:20}},
  ]}));
- for(const label of ['Reading performance by period','Miscues by type','95.00','40.00','Not administered','Details unavailable'])assert.ok(summary.includes(label),label);
- assert.match(summary,/>Omission<\/th><td>Not administered<\/td><td>1<\/td><td>Details unavailable<\/td>/);
- assert.match(summary,/>Substitution<\/th><td>Not administered<\/td><td>0<\/td><td>Details unavailable<\/td>/);
+ for(const label of ['Reading Performance','Miscues by Type','1 min 0 sec','2 min 0 sec','Total miscues','95.00','40.00','Not administered','Details unavailable','View omission details'])assert.ok(summary.includes(label),label);
+ assert.match(summary,/>Omission<\/th><td role="cell">Not administered<\/td><td role="cell">1<\/td><td role="cell">Details unavailable<\/td>/);
+ assert.match(summary,/>Substitution<\/th><td role="cell">Not administered<\/td><td role="cell">0<\/td><td role="cell">Details unavailable<\/td>/);
+ assert.doesNotMatch(summary,/>Measure<|Total scored miscues/);
+ const words=periodModel.compareLearnerMiscueWords([
+   {period:'BoSY',saved:{story_text:'The cat sat on the mat.',passage_miscues:[{word_index:1,miscue_type:'Omission'},{word_index:5,miscue_type:'Omission'}]},passage:true},
+   {period:'MoSY',saved:{story_text:'Cat, fox and CAT!',passage_miscues:[{wordIndex:3,type:'Substitution',misreadWord:'kitten'},{wordIndex:0,type:'Last Word Read'}]},passage:true},
+   {period:'EoSY',saved:{story_text:'That cat slept.',passage_miscues:[]},passage:true},
+ ],'omission',new Set(['substitution','omission']));
+ const cat=words.find(row=>row.key==='cat');
+ assert.equal(cat.periods[0].observations[0].type,'omission');
+ assert.equal(cat.periods[1].observations[0].type,'substitution');
+ assert.equal(cat.periods[1].observations[0].position,4);
+ assert.equal(cat.periods[1].observations[0].misreadWord,'kitten');
+ assert.deepEqual(cat.periods[1].occurrences,[1,4]);
+ assert.equal(cat.periods[2].note,'No miscue recorded');
+ assert.equal(words.find(row=>row.key==='mat').periods[1].note,'Word not in passage');
  const comparison=await import('../lib/profileComparison.mjs');
  const labels=['Reading At Grade Level'],periods=[{period:'BoSY',total:1,profiles:[{label:labels[0],count:1}]},{period:'MoSY',total:0,profiles:[]},{period:'EoSY',total:0,profiles:[]}];
  const row=comparison.profileComparisonData(periods).rows.find(r=>r.label===labels[0]);assert.equal(row.values[0].count,1);assert.equal(row.values[1].count,null);assert.equal(row.values[2].assessed,false);

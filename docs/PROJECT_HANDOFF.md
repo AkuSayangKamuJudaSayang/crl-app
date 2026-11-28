@@ -5,6 +5,21 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Miscue word comparison and stable teacher refresh — CRL-2026-11-28.2
+
+The learner Summary compares recorded passage miscues by normalized word
+spelling across periods, retaining positions when a word recurs or the story
+changes. It also shows other recorded miscue types for that word. Absence of a
+recorded miscue does not establish a correct reading. Older records without
+passage text must not infer word matches from position alone.
+
+Teacher background reads preserve the mounted roster and the scoped learner
+dialog. Section changes do not rerun the dashboard's bootstrap fetch.
+Assessment detail follows the active learner, section and result IDs, including
+online/offline reconciliation state. Existing timed refresh, completion
+updates, class timeline polling, manual refresh, and offline replay still
+operate. No changes to scoring, the manuscript, or the database schema.
+
 ## Learner period results and roster archiving — CRL-2026-11-28.1
 
 The Conduct Assessment roster supersedes the mobile learner cards and

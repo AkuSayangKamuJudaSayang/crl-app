@@ -80,7 +80,7 @@ const vm = require("node:vm");
     exit.includes("setChoosingClass(false)") && exit.includes("clearConductAssessmentReturn()"),
     "Save/back must reveal the already-loaded, already-selected enrolled roster immediately");
   assert(source.includes('event?.detail?.assessmentCompleted === true') &&
-    source.includes('api("get_assessments")') &&
+    source.includes('requestTeacherAssessment("get_assessments")') &&
     !exit.includes("loadData("),
     "After Save, update only assessment status asynchronously; do not refetch learners/classes/activities");
   assert(source.includes("consumeConductAssessmentReturn(user.id, classesData)"),

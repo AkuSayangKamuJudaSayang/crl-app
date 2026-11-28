@@ -1029,14 +1029,29 @@ html[data-crl-theme] .analyticsIndividualPrint button.toolbarButton.individualEx
   }
 }
 .learnerPeriodSummary { display: grid; gap: 18px; min-width: 0; }
-.learnerComparisonScroll {
+.learnerComparisonCard {
   min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
   border: 1px solid var(--crl-line);
   border-radius: 10px;
+  overflow: hidden;
 }
-.learnerComparisonScroll:focus-visible { outline: 2px solid #568cd1; outline-offset: 2px; }
+.learnerComparisonCard > h3 {
+  margin: 0;
+  padding: 14px 10px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--crl-ink);
+}
+.learnerComparisonScroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--crl-line-strong) transparent;
+}
+.learnerComparisonScroll:focus-visible { outline: 2px solid #568cd1; outline-offset: -2px; }
 .learnerComparisonTable {
   min-width: 470px;
   width: 100%;
@@ -1045,25 +1060,52 @@ html[data-crl-theme] .analyticsIndividualPrint button.toolbarButton.individualEx
   font-size: 13px;
   color: var(--crl-text);
 }
-.learnerComparisonTable caption {
-  padding: 13px;
-  text-align: left;
-  font-size: 15px;
-  font-weight: 750;
-  color: var(--crl-ink);
-}
 .learnerComparisonTable :is(th, td) {
-  background: var(--crl-surface);
   padding: 10px 12px;
-  border-top: 1px solid var(--crl-line);
-  text-align: left;
+  border-block-end: 1px solid var(--crl-line);
+  text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.learnerComparisonTable thead th { background: var(--crl-soft); }
-.learnerComparisonTable tr > th:first-child { width: 29%; }
+.learnerComparisonTable tbody th { text-align: left; }
+.learnerComparisonTable tr > :first-child { width: 29%; }
+.sharedAssessmentResults .learnerComparisonTable thead :is(th, td) { background: var(--crl-soft)!important; }
+.sharedAssessmentResults .learnerComparisonTable tbody tr:nth-child(even) :is(th, td) { background: var(--crl-soft)!important; }
+.sharedAssessmentResults .learnerComparisonTable tbody tr:nth-child(odd) :is(th, td) { background: var(--crl-surface)!important; }
 .learnerComparisonTable tbody th { font-weight: 650; color: var(--crl-ink); }
-.learnerComparisonTable tbody tr:nth-child(even) :is(th, td) { background: var(--crl-soft); }
+.hasMiscueActions .learnerComparisonTable tr > :last-child { width: 74px; padding-inline: 6px; }
+.sharedAssessmentResults .learnerMiscueView {
+  min-width: 54px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--crl-line-strong);
+  border-radius: 8px;
+  color: var(--crl-ink);
+  background: var(--crl-surface);
+  font: 700 13px/1.3 Arial, sans-serif;
+  cursor: pointer;
+}
+@media (hover:hover) {
+  .sharedAssessmentResults .learnerMiscueView:hover { background: var(--crl-soft); border-color: #568cd1; }
+}
+.sharedAssessmentResults .learnerMiscueView:focus-visible { outline: 2px solid #568cd1; outline-offset: 2px; }
+.learnerMiscueDetails { display: grid; gap: 14px; }
+.learnerMiscueDetails > p { margin: 0; color: var(--crl-muted); font-size: 14px; }
+.learnerMiscueWord {
+  padding: 12px;
+  border: 1px solid var(--crl-line);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.learnerMiscueWord h3 { margin: 0 0 10px; color: var(--crl-ink); font-size: 17px; }
+.learnerMiscuePeriods { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.learnerMiscuePeriod { padding: 10px; border-radius: 8px; background: var(--crl-soft); color: var(--crl-text); font-size: 13px; }
+.learnerMiscuePeriod h4 { margin: 0 0 4px; color: var(--crl-ink); font-size: 13px; }
+.learnerMiscuePeriod small { display: block; color: var(--crl-muted); }
+.learnerMiscuePeriod p,.learnerMiscuePeriod ul { margin: 6px 0 0; }
+.learnerMiscuePeriod ul { padding: 0; list-style: none; }
+.learnerMiscuePeriod li { display: grid; gap: 3px; padding: 6px 0; border-top: 1px solid var(--crl-line); }
+.learnerMiscuePeriod li span { color: var(--crl-muted); }
 .learnerPeriodHeading { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-bottom:14px; color:var(--crl-ink); }
 .learnerPeriodHeading h3 { margin:0; font-size:16px; }
 .learnerPeriodHeading > span { padding:5px 9px; border-radius:999px; background:var(--crl-soft); color:var(--crl-muted); font-size:13px; }
@@ -1072,4 +1114,27 @@ html[data-crl-theme] .analyticsIndividualPrint button.toolbarButton.individualEx
   .learnerResultHeader .analyticsPeriodSwitch { display:grid; width:100%; }
   .learnerResultHeader .analyticsPeriodSwitch button { padding-inline:4px; }
   .learnerPeriodSummary { gap:12px; }
+  .learnerComparisonTable,
+  .learnerComparisonTable :is(thead, tbody) { display: block; min-width: 0; }
+  .learnerComparisonTable { font-size: 12px; }
+  .learnerComparisonTable tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .learnerComparisonTable thead td { display: none; }
+  .learnerComparisonTable tr > :first-child,
+  .hasMiscueActions .learnerComparisonTable tr > :last-child { width: auto; }
+  .learnerComparisonTable tbody th { grid-column: 1 / -1; }
+  .sharedAssessmentResults .learnerComparisonTable tbody tr > * { border-bottom: 0!important; }
+  .sharedAssessmentResults .learnerComparisonTable tbody tr {
+    border-bottom: 1px solid var(--crl-line)!important;
+  }
+  html[data-crl-theme] .learnerComparisonTable :is(th, td) { padding: 8px 5px!important; }
+  .hasMiscueActions .learnerComparisonTable tbody th {
+    grid-area: 1 / 1 / 2 / 3;
+    align-content: center;
+  }
+  .hasMiscueActions .learnerComparisonTable tbody td { grid-row: 2; }
+  .hasMiscueActions .learnerComparisonTable tbody td:last-child { grid-area: 1 / 3; }
+  .learnerMiscuePeriods { grid-template-columns: 1fr; }
 }
