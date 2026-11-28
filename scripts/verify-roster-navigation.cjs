@@ -15,18 +15,17 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   {id:7,learner_id:2,assessment_period:'EoSY',is_completed:false},
  ];
  const byLearner=periodModel.latestLearnerPeriodResults(results);
- const props={...periodModel,...records,...recommendationModel,remarksPeriod:"BoSY",recommendationKey:row=>row.id,getRecommendationDraft(){},setRecommendationDraft(){},saveLearnerRecommendation(){},LearnerRemarksField:({name,period,value})=>React.createElement("textarea",{"aria-label":period+" recommendation remarks for "+name,defaultValue:value}),Select:({children,...rest})=>React.createElement("select",{...rest,onChange:()=>{}},children),learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
+ const props={...periodModel,...records,...recommendationModel,learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
  const Roster=await compile('export default function View(){return ('+page.slice(start,end)+'</div>);}',props);
  const html=renderToStaticMarkup(React.createElement(Roster));
- assert.equal((html.match(/scope="col"/g)||[]).length,5);
+ assert.equal((html.match(/scope="col"/g)||[]).length,4);
  assert.equal((html.match(/scope="row"/g)||[]).length,2);
- assert.equal((html.match(/<td[ >]/g)||[]).length,8);
- for(const label of ['LRN:','Sex:','Recommendation remarks','Remarks period','<textarea','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
+ assert.equal((html.match(/<td[ >]/g)||[]).length,6);
+ for(const label of ['LRN:','Sex:','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
  assert.ok(!html.includes('Developing Reader'));
  assert.ok(!html.includes('Delete'));
  assert.match(page,/\.learnerRoster \.rosterIdentity \{\s+position:sticky; left:0;/);
- assert.doesNotMatch(html, /Select all visible learners|Reading follow-up|Export follow-up report|Add recommendation|Edit recommendation/);
- assert.equal((html.match(/<textarea/g)||[]).length,2);
+ assert.doesNotMatch(html, /Select all visible learners|Reading follow-up|Export follow-up report|Add recommendation|Edit recommendation|Recommendation remarks|Remarks period|<textarea/);
  assert.equal(periodModel.countLearnerMiscues({}),null);
  assert.equal(periodModel.countLearnerMiscues({passage_miscues:[]}).size,0);
  const miscues=periodModel.countLearnerMiscues({passage_miscues:[{miscue_type:'Last Word Read'},{miscue_type:'SelfCorrection'},{miscueType:'Self-correction'},{type:'Omission'}]});
@@ -61,16 +60,35 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  assert.deepEqual(projected[0].period_recommendations,{BoSY:'Original',MoSY:'Local',EoSY:'Pending'});
  assert.equal(projected[1],roster[1]);
  const followUp=await import('../lib/readingFollowUp.mjs');
- const low=followUp.readingFollowUpGuidance('Low Emerging Reader');
- assert.match(low.recommendation,/letter sounds.*blending/);
- assert.deepEqual(low.interventions.map(([label])=>label),['Letter–sound practice','Oral rhyming and blending','Guided word decoding']);
- assert.notDeepEqual(followUp.readingFollowUpGuidance('Reading At Grade Level').interventions,low.interventions);
- assert.equal(followUp.readingFollowUpGuidance('').recommendation,'');
- const followUpLearner={id:1,lrn:'000000000001',first_name:'Synthetic',last_name:'Learner',period_recommendations:{BoSY:'=1+1'}};
+ const {readingInterventionOptions,generateReadingRecommendation}=await import('../lib/readingInterventions.mjs');
+ const low=readingInterventionOptions('Low Emerging Reader');
+ assert.deepEqual(low.map(({label})=>label),['Letter–sound practice','Oral rhyming and blending','Guided word decoding']);
+ assert.equal(readingInterventionOptions('Reading At Grade Level').length,1);
+ assert.match(generateReadingRecommendation(['letter-sounds','word-decoding']),/letter cards[\s\S]*letter tiles/);
+ assert.doesNotMatch(generateReadingRecommendation(['letter-sounds','word-decoding']),/rhyming/);
+ assert.ok(generateReadingRecommendation(readingInterventionOptions('').map(({id})=>id)).length<=recommendationModel.RECOMMENDATION_LIMIT);
+ assert.throws(()=>validateLearnerRecommendationChanges({BoSY:'',interventions:{BoSY:['unknown']}}),/valid reading interventions/);
+ const legacy={BoSY:'Original',MoSY:'Keep',interventions:{BoSY:['letter-sounds'],MoSY:['word-decoding']}};
+ const newSelection=validateLearnerRecommendationChanges({BoSY:'',interventions:{BoSY:['rhyming-blending','letter-sounds','letter-sounds']}});
+ const next=applyLearnerRecommendationChanges(legacy,newSelection);
+ assert.deepEqual(next,{MoSY:'Keep',interventions:{BoSY:['rhyming-blending','letter-sounds'],MoSY:['word-decoding']}});
+ assert.deepEqual(applyLearnerRecommendationChanges(next,{MoSY:'New'}).interventions,next.interventions);
+ assert.deepEqual(applyLearnerRecommendationChanges(next,{interventions:{BoSY:[]}}).interventions,{MoSY:['word-decoding']});
+ assert.deepEqual(recommendationModel.applyLearnerRecommendationReceipt(legacy,next,newSelection),next);
+ const aliasEntries=[
+   {kind:'save_learner_recommendations',body:{learner_id:81,class_section_id:'section',recommendations:{interventions:{BoSY:['letter-sounds'],EoSY:['text-evidence']}}}},
+   {kind:'save_learner_recommendations',body:{learner_id:-81,class_section_id:'section',recommendations:{interventions:{BoSY:['word-decoding'],MoSY:['common-words']}}}},
+ ];
+ assert.deepEqual(projectLearnerRecommendations(roster,aliasEntries)[0].period_recommendations.interventions,
+   {BoSY:['word-decoding'],MoSY:['common-words'],EoSY:['text-evidence']});
+ const followUpLearner={id:1,lrn:'000000000001',first_name:'Synthetic',last_name:'Leárner',period_recommendations:{BoSY:'=1+1',interventions:{BoSY:['word-decoding','letter-sounds']}}};
  assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').BoSY,'BoSY','Low Emerging Reader','with'),true);
  assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').MoSY,'MoSY','Low Emerging Reader','with'),false);
  assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').MoSY,'MoSY','Reading At Grade Level','without'),true);
  assert.equal(followUp.matchesReadingFollowUp(followUpLearner,undefined,'EoSY','unassessed','without'),true);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').BoSY,'BoSY','','','Synthetic Learner'),true);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').BoSY,'BoSY','','','000000000001'),true);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').BoSY,'BoSY','','','unknown'),false);
  const {buildReadingFollowUpReport}=await import('../lib/readingFollowUpExport.js');
  const xlsx=await import('xlsx');
  const {blob,filename}=await buildReadingFollowUpReport({learners:[followUpLearner],results:byLearner,period:'BoSY',section:'Sample',year:'2026-2027'});
@@ -80,7 +98,8 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  assert.equal(sheet.G2.v,'Low Emerging Reader');
  assert.equal(sheet.H2.v,'=1+1');
  assert.equal(sheet.H2.f,undefined);
- assert.equal(sheet['!autofilter'].ref,'A1:H2');
+ assert.equal(sheet.I2.v,'Guided word decoding, Letter–sound practice');
+ assert.equal(sheet['!autofilter'].ref,'A1:I2');
  const route=fs.readFileSync('app/api/assessment/route.js','utf8');
  const saveStart=route.indexOf('    if (action === "save_learner_recommendations")');
  const saveEnd=route.indexOf('    if (action === "reconcile_offline_assessment")',saveStart);
@@ -99,11 +118,11 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   lockClass:async(_tx,owner,id)=>{assert.equal(owner,userId);assert.equal(id,sectionId);return{id};},
  });
  const save=vm.runInContext('(async (action,body)=>{'+route.slice(saveStart,saveEnd)+'})',scope);
- const payload={learner_id:learnerId,class_section_id:sectionId,roster_version:2,recommendations:{BoSY:'New',EoSY:'End'}};
+ const payload={learner_id:learnerId,class_section_id:sectionId,roster_version:2,recommendations:{BoSY:'New',EoSY:'End',interventions:{BoSY:['word-decoding'],EoSY:['text-evidence']}}};
  await save('save_learner_recommendations',payload);
  await save('save_learner_recommendations',payload);
  assert.deepEqual(identity,{id:learnerId,teacherId:userId,classSectionId:sectionId});
- assert.deepEqual(saved,{BoSY:'New',MoSY:'Keep',EoSY:'End'});
+ assert.deepEqual(saved,{BoSY:'New',MoSY:'Keep',EoSY:'End',interventions:{BoSY:['word-decoding'],EoSY:['text-evidence']}});
  owned=false;
  await assert.rejects(()=>save('save_learner_recommendations',payload),/unavailable in the selected class/);
  const comparison=await import('../lib/profileComparison.mjs');

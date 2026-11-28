@@ -5,6 +5,21 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Learner recommendation overlay — CRL-2026-11-29.2
+
+Manage reading follow-up from Recommendations and Interventions after
+choosing the school year and section. This supersedes the roster remarks
+field in Conduct Assessment. The workspace scopes search, profiles,
+interventions and exported rows to the selected class and period.
+
+The editor keeps selected presets and free text separately. Generating text
+is optional and runs locally from editable DepEd-informed activity examples.
+Save and discard use explicit confirmation when the teacher closes a dirty
+form. Keep existing text at its period key and store selected intervention
+IDs in the optional interventions map on the same enrollment. Apply only the
+submitted periods when acknowledging cloud and offline changes. Archive
+copies must preserve both the text and the selections.
+
 ## Recommendations and Interventions — CRL-2026-11-29.1
 
 This workspace supersedes the Conduct Assessment follow-up toolbar from 28.4.

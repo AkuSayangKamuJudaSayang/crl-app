@@ -40,9 +40,8 @@ import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
 import { printReadingProfileAnalytics } from "../../lib/printAnalytics";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
-import LearnerRemarksField from "../../components/LearnerRemarksField";
 import TeacherReadingRecommendations from "../../components/TeacherReadingRecommendations";
-import { applyLearnerRecommendationChanges, readLearnerRecommendations } from "../../lib/learnerRecommendations.mjs";
+import { applyLearnerRecommendationReceipt } from "../../lib/learnerRecommendations.mjs";
 import ArchiveLearnersDialog from "../../components/ArchiveLearnersDialog";
 import { latestLearnerPeriodResults, learnerPeriodProfile, learnerPeriodStatus } from "../../lib/learnerPeriodResults.mjs";
 import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
@@ -1111,9 +1110,6 @@ export default function TeacherPage() {
   const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
   const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
   const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
-  const [remarksPeriod, setRemarksPeriod] = useState(PERIODS[0]);
-  const [recommendationDrafts, setRecommendationDrafts] = useState({});
-  const recommendationSaves = useRef(new Set());
   const [analyticsDetailsById, setAnalyticsDetailsById] = useState({});
 
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
@@ -2743,57 +2739,37 @@ export default function TeacherPage() {
     setSelectedLearnerIds([]);
   };
 
-  const recommendationKey = (learner, period, sectionId = selectedSectionId) =>
-    JSON.stringify([sectionId, learner.local_id ?? learner.id, period]);
-  const getRecommendationDraft = (learner, period) => recommendationDrafts[recommendationKey(learner, period)];
-
-  const setRecommendationDraft = (learner, period, value) => {
-    const key = recommendationKey(learner, period);
-    setRecommendationDrafts(current => {
-      if (value !== undefined) return { ...current, [key]: value };
-      const { [key]: removed, ...rest } = current;
-      return rest;
-    });
-  };
-
-  const saveLearnerRecommendation = async (learner, period, text) => {
+  const saveLearnerRecommendation = async (target, period, text, interventions) => {
     const sectionId = selectedSectionId;
-    if (classReadonly || classIdOf(learner) !== sectionId || deletingRef.current) {
+    const learner = allLearners.find(row => classIdOf(row) === sectionId &&
+      [row.id, row.local_id].some(id => id != null && Number(id) === Number(target.id)));
+    if (!learner || classReadonly || classIdOf(target) !== sectionId || deletingRef.current) {
       throw new Error("This learner is unavailable for editing.");
     }
-    const key = recommendationKey(learner, period, sectionId);
-    if (recommendationSaves.current.has(key)) throw new Error("A save is already in progress. Try again shortly.");
-    recommendationSaves.current.add(key);
-    const submittedDraft = recommendationDrafts[key];
-    try {
-      const receipt = await api("save_learner_recommendations", {
-        method: "POST",
-        body: { learner_id: learner.id, class_section_id: sectionId, recommendations: { [period]: text } },
-      });
-      const receiptId = Number(receipt.learner_id);
-      const validReceipt = receiptId === Number(learner.id) || (learner.id < 0 && receipt.offline && receiptId > 0);
-      if (!receipt.period_recommendations || !validReceipt) {
-        throw new Error("The recommendation save could not be confirmed.");
-      }
-      const value = readLearnerRecommendations(receipt.period_recommendations)[period] ?? "";
-      setLearners(current => current.map(row => {
-        const sameEnrollment = classIdOf(row) === sectionId &&
-          [Number(row.id), Number(row.local_id)].some(id => [Number(learner.id), receiptId].includes(id));
-        return sameEnrollment ? {
-          ...row,
-          period_recommendations: applyLearnerRecommendationChanges(row.period_recommendations, { [period]: value }),
-          recommendations_acknowledged_at: Date.now(),
-        } : row;
-      }));
-      setRecommendationDrafts(current => {
-        if (current[key] !== submittedDraft) return current;
-        const { [key]: removed, ...rest } = current;
-        return rest;
-      });
-      showToast(receipt.offline ? "Recommendation saved on this device. Sync pending." : "Recommendation saved.");
-    } finally {
-      recommendationSaves.current.delete(key);
+    const changes = { [period]: text, interventions: { [period]: interventions } };
+    const receipt = await api("save_learner_recommendations", {
+      method: "POST",
+      body: {
+        learner_id: learner.id,
+        class_section_id: sectionId,
+        recommendations: changes,
+      },
+    });
+    const receiptId = Number(receipt.learner_id);
+    const validReceipt = receiptId === Number(learner.id) || (learner.id < 0 && receipt.offline && receiptId > 0);
+    if (!receipt.period_recommendations || !validReceipt) {
+      throw new Error("The recommendation save could not be confirmed.");
     }
+    setLearners(current => current.map(row => {
+      const sameEnrollment = classIdOf(row) === sectionId &&
+        [Number(row.id), Number(row.local_id)].some(id => [Number(learner.id), receiptId].includes(id));
+      return sameEnrollment ? {
+        ...row,
+        period_recommendations: applyLearnerRecommendationReceipt(row.period_recommendations, receipt.period_recommendations, changes),
+        recommendations_acknowledged_at: Date.now(),
+      } : row;
+    }));
+    showToast(receipt.offline ? "Recommendation saved on this device. Sync pending." : "Recommendation saved.");
   };
 
   const bulkDeleteLearners = async (skipConfirm = false, confirmation = {}) => {
@@ -12358,7 +12334,6 @@ export default function TeacherPage() {
         .learnerRoster {
           --roster-identity-min:345px;
           --roster-period-width:clamp(112px,calc((100vw - 320px) / 3),225px);
-          --roster-recommendation-width:clamp(168px,19vw,300px);
           overflow-x:auto;
           scroll-padding-inline-start:var(--roster-identity-min);
           overscroll-behavior-inline:contain;
@@ -12367,7 +12342,7 @@ export default function TeacherPage() {
         }
         html[data-crl-theme] .learnerRoster table {
           width:100%!important;
-          min-width:calc(var(--roster-identity-min) + 3 * var(--roster-period-width) + var(--roster-recommendation-width))!important;
+          min-width:calc(var(--roster-identity-min) + 3 * var(--roster-period-width))!important;
           table-layout:fixed;
           border-collapse:separate!important;
           border-spacing:0;
@@ -12385,7 +12360,6 @@ export default function TeacherPage() {
         }
         html[data-crl-theme] .learnerRoster thead .rosterIdentity { background:var(--crl-surface-2)!important; }
         .learnerRoster col.rosterPeriodColumn { width:var(--roster-period-width); }
-        .learnerRoster col.rosterRecommendationColumn { width:var(--roster-recommendation-width); }
         .rosterLearner { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:15px; text-align:left; }
         .rosterLearner input { margin:0 0 0 -4px; }
         .rosterLearnerDetails { min-width:0; display:grid; gap:8px; text-transform:none; letter-spacing:normal; overflow-wrap:anywhere; }
@@ -12394,57 +12368,55 @@ export default function TeacherPage() {
         .rosterPeriodContent { display:grid; justify-items:center; gap:5px; text-align:center; overflow-wrap:anywhere; }
         .rosterPeriodContent .badge { max-width:100%; white-space:normal; line-height:1.35; }
         .rosterLearner .inlineActions { display:grid; grid-template-columns:repeat(2,minmax(0,auto)); gap:6px; margin:0; }
-        .bentoTile[data-tab="recommendations"] .bentoLabel { min-width:0; max-width:100%; overflow-wrap:anywhere; font-size:clamp(14px,1.45vw,20px); }
+        .bentoTile[data-tab="recommendations"] .bentoLabel { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+        @media(min-width:1025px) and (max-width:1359px) {
+          .bentoBlocks { grid-template-columns:repeat(2,minmax(0,1fr)) minmax(226px,1.2fr); }
+        }
         @media(min-width:1360px) {
-          .bentoBlocks { grid-template-columns:repeat(4,minmax(0,1fr)); }
+          .bentoBlocks { grid-template-columns:repeat(2,minmax(0,1fr)) minmax(214px,1.27fr) minmax(0,1fr); }
           .bentoTile { padding:18px; }
-          .bentoTile[data-tab="recommendations"] .bentoLabel { font-size:16px; }
+        }
+        @media(max-width:420px) {
+          .bentoTile[data-tab="recommendations"] { grid-column:1 / -1; }
         }
         .topbarTitle[data-tab="recommendations"] { overflow-wrap:anywhere; white-space:normal; }
-        .rosterRemarksHeader { display:grid; justify-items:center; gap:6px; }
-        .rosterRemarksHeader > [data-crl-select] { width:min(100%, 110px); font-size:12px; letter-spacing:normal; text-transform:none; }
-        .rosterRemarks { display:grid; gap:4px; text-align:left; }
-        .rosterRemarks small { overflow-wrap:anywhere; font-size:12px; color:var(--crl-muted); }
-        .rosterRemarks textarea,.readingRecommendationInput textarea {
-          box-sizing:border-box; width:100%; min-width:0; min-height:48px; padding:9px;
-          border:1px solid var(--crl-line-strong); border-radius:8px; color:var(--crl-text);
-          background:var(--crl-surface); font:14px/1.45 Arial,sans-serif; resize:vertical;
+        .recommendationsWorkspace {
+          display:grid; grid-template-columns:minmax(236px, 284px) minmax(0,1fr);
+          gap:16px; align-items:start; min-width:0;
         }
-        .rosterRemarks textarea:focus-visible,.readingRecommendationInput textarea:focus-visible,.readingRecommendationEditor:focus-visible { outline:2px solid #568cd1; outline-offset:-2px; }
+        .recommendationFilters { display:grid; gap:13px; min-width:0; padding:16px; }
+        .recommendationFilters h2,.recommendationsHeader h2 { margin:0; font-size:21px; color:var(--crl-text); }
+        .recommendationFilters label { display:grid; min-width:0; gap:5px; font-size:13px; font-weight:700; color:var(--crl-text); }
+        .recommendationFilters input {
+          box-sizing:border-box; width:100%; min-width:0; min-height:46px; padding:10px 12px; border:1px solid var(--crl-line-strong);
+          border-radius:9px; background:var(--crl-surface); color:var(--crl-text); font:400 16px/1.35 Arial,sans-serif;
+        }
+        .recommendationFilters input:focus-visible { outline:2px solid #568cd1; outline-offset:1px; }
         .recommendationsPanel { min-width:0; }
-        .recommendationsHeader { flex-wrap:wrap; gap:8px 16px; }
-        .recommendationsHeader h2 { margin:0; font-size:clamp(20px,2.5vw,26px); color:var(--crl-text); }
-        .recommendationsHeader > span { color:var(--crl-muted); font-size:13px; }
-        .readingFollowUpBar { display:grid; grid-template-columns:minmax(104px,.6fr) minmax(180px,1fr) minmax(195px,1.15fr) auto; align-items:end; gap:10px; padding:14px 16px; border-bottom:1px solid var(--crl-line); }
-        .readingFollowUpBar label,.readingInterventionPicker label,.readingRecommendationInput { display:grid; min-width:0; gap:5px; font-size:13px; font-weight:700; color:var(--crl-text); }
-        .readingFollowUpBar .toolbarButton { min-height:44px; width:auto; margin-inline-start:auto; }
+        .recommendationsHeader { flex-wrap:wrap; justify-content:space-between; gap:8px 16px; }
+        .recommendationsHeader p { margin:2px 0 0; color:var(--crl-muted); font-size:13px; }
+        .recommendationsHeader .toolbarButton { width:auto; min-height:44px; }
         .recommendationsCount,.recommendationsEmpty { margin:12px 16px; font-size:14px; color:var(--crl-muted); }
         .recommendationsList { display:grid; gap:10px; list-style:none; margin:0; padding:0 16px 16px; }
         .recommendationCard { min-width:0; border:1px solid var(--crl-line); border-radius:12px; overflow:hidden; }
         .recommendationCardHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; background:var(--crl-surface-2); }
-        .recommendationCardHeader > div { min-width:0; }
-        .recommendationCardHeader strong { overflow-wrap:anywhere; color:var(--crl-text); }
-        .recommendationCardHeader p,.recommendationCardNote { margin:4px 0 0; font-size:13px; color:var(--crl-muted); overflow-wrap:anywhere; }
-        .recommendationCardNote { margin:0; padding:10px 14px; color:var(--crl-text); white-space:pre-wrap; }
+        .recommendationCardHeader > div { min-width:0; color:var(--crl-text); overflow-wrap:anywhere; }
+        .recommendationCardHeader p { margin:3px 0; font-size:13px; color:var(--crl-muted); }
+        .recommendationCardHeader .badge { white-space:normal; }
+        .recommendationCardNote,.recommendationCardInterventions {
+          margin:0; padding:8px 14px; font-size:14px; color:var(--crl-text); white-space:pre-wrap; overflow-wrap:anywhere;
+        }
+        .recommendationCardInterventions { font-weight:700; }
+        .recommendationCardInterventions + .recommendationCardNote { padding-top:0; }
         .recommendationCardHeader .toolbarButton { flex:none; width:auto; min-height:44px; }
-        .readingRecommendationEditor { box-sizing:border-box; display:grid; gap:12px; padding:16px; color:var(--crl-text); text-align:left; background:var(--crl-surface); }
-        .readingRecommendationSuggestion,.readingInterventionPicker,.readingRecommendationActions { display:flex; align-items:end; flex-wrap:wrap; gap:8px; min-width:0; }
-        .readingRecommendationSuggestion { align-items:center; padding:10px; border-radius:8px; background:var(--crl-surface-2); }
-        .readingRecommendationSuggestion p { flex:1 1 240px; margin:0; color:var(--crl-text); font-size:14px; line-height:1.45; }
-        .readingInterventionPicker label { flex:1 1 220px; }
-        .readingRecommendationActions a { margin-inline-end:auto; color:var(--crl-blue); font-size:13px; padding:6px 0; }
-        .readingRecommendationEditor .toolbarButton { min-height:44px; width:auto; max-width:100%; white-space:normal; }
-        .readingRecommendationError,.rosterRemarks .readingRecommendationError { margin:0; color:var(--crl-danger,#bb4848); }
-        @media(max-width:780px) {
-          .readingFollowUpBar { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        @media(max-width:700px) {
+          .recommendationsWorkspace { grid-template-columns:minmax(0,1fr); gap:12px; }
+          .recommendationFilters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .recommendationFilters h2,.recommendationFilters label:first-of-type { grid-column:1/-1; }
         }
-        @media(max-width:520px) {
-          .readingFollowUpBar { grid-template-columns:minmax(0,1fr); }
-          .readingFollowUpBar .toolbarButton { width:100%; }
-        }
-        @media(max-width:430px) {
-          .bentoTile[data-tab="recommendations"] .bentoLabel { font-size:clamp(12px,3.4vw,14px); }
-          .rosterRemarks textarea,.readingRecommendationInput textarea { font-size:16px; }
+        @media(max-width:490px) {
+          .recommendationFilters { grid-template-columns:minmax(0,1fr); }
+          .recommendationsHeader .toolbarButton { width:100%; }
         }
         .learnerRoster:focus-visible { outline:2px solid var(--crl-active-bg,#3978b5); outline-offset:3px; }
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:60px;padding:7px 10px!important;font:700 13px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
@@ -12457,13 +12429,11 @@ export default function TeacherPage() {
         @media(max-width:720px){
           .learnerRoster {
             --roster-identity-min:clamp(156px,48vw,235px);
-            --roster-recommendation-width:clamp(104px,calc(100vw - var(--roster-identity-min) - 54px),168px);
           }
           html[data-crl-theme] .learnerRoster :is(th,td) { padding:8px!important; }
           .rosterLearner { grid-template-columns:auto minmax(0,1fr); gap:8px; font-size:12px; }
           .rosterLearnerDetails { gap:5px; }
           .rosterLearnerDetails small,.rosterPeriodStatus { font-size:11px; }
-          html[data-crl-theme] .learnerRoster thead th:last-child { font-size:10px!important; letter-spacing:0!important; }
           .rosterLearner .inlineActions { grid-column:1 / -1; justify-content:start; }
           html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:44px; padding:6px!important; font-size:12px!important; }
         }
@@ -12911,20 +12881,11 @@ export default function TeacherPage() {
                             <colgroup>
                               <col />
                               {PERIODS.map(period => <col className="rosterPeriodColumn" key={period} />)}
-                              <col className="rosterRecommendationColumn" />
                             </colgroup>
                             <thead>
                               <tr>
                                 <th scope="col" className="rosterIdentity">Learner</th>
                                 {PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}
-                                <th scope="col">
-                                  <div className="rosterRemarksHeader">
-                                    <span>Recommendation remarks</span>
-                                    <Select aria-label="Remarks period" value={remarksPeriod} onChange={event => setRemarksPeriod(event.target.value)}>
-                                      {PERIODS.map(period => <option key={period} value={period}>{period}</option>)}
-                                    </Select>
-                                  </div>
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -12937,7 +12898,6 @@ export default function TeacherPage() {
                                 });
                                 const selected = selectedLearnerIds.includes(Number(learner.id));
                                 const results = learnerPeriodResults.get(String(learner.id));
-                                const recommendation = readLearnerRecommendations(learner.period_recommendations)[remarksPeriod] ?? "";
                                 return (
                                   <tr key={learner.id} className={selected ? "selectedRow" : ""}>
                                     <th scope="row" className="rosterIdentity">
@@ -12971,18 +12931,6 @@ export default function TeacherPage() {
                                         </td>
                                       );
                                     })}
-                                    <td>
-                                      <LearnerRemarksField
-                                        key={recommendationKey(learner, remarksPeriod)}
-                                        name={name}
-                                        period={remarksPeriod}
-                                        value={recommendation}
-                                        draft={getRecommendationDraft(learner, remarksPeriod)}
-                                        readOnly={classReadonly}
-                                        onChange={text => setRecommendationDraft(learner, remarksPeriod, text)}
-                                        onSave={text => saveLearnerRecommendation(learner, remarksPeriod, text)}
-                                      />
-                                    </td>
                                   </tr>
                                 );
                               })}
@@ -13003,8 +12951,6 @@ export default function TeacherPage() {
                   section={selectedClass.name}
                   year={selectedYear?.label}
                   readOnly={classReadonly}
-                  getDraft={getRecommendationDraft}
-                  onDraftChange={setRecommendationDraft}
                   onSave={saveLearnerRecommendation}
                   onError={showToast}
                 />

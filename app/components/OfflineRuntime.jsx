@@ -1,5 +1,5 @@
 "use client";
-import { projectLearnerRecommendations, readLearnerRecommendations, validateLearnerRecommendationChanges } from "../../lib/learnerRecommendations.mjs";
+import { applyLearnerRecommendationReceipt, projectLearnerRecommendations, validateLearnerRecommendationChanges } from "../../lib/learnerRecommendations.mjs";
 import { verifyLocalDeletionAuthorization } from "../../lib/deletionPasswordClient.mjs";
 import { learnerIdentityConflict, classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
@@ -739,13 +739,13 @@ function mergeCachedLearners(cached, cloud, tombstones = [], classes = null, rea
   }), ...pending];
 }
 
-async function rememberLearnerRecommendations(userId, sectionId, receipt) {
+async function rememberLearnerRecommendations(userId, sectionId, receipt, submitted) {
   const id = Number(receipt?.learner_id);
   if (!Number.isSafeInteger(id) || id <= 0 || !receipt?.period_recommendations) return;
   await updateSnapshot(userId, current => ({
     learners: current.learners.map(learner => Number(learner.id) === id && classIdOf(learner) === sectionId ? {
       ...learner,
-      period_recommendations: readLearnerRecommendations(receipt.period_recommendations),
+      period_recommendations: applyLearnerRecommendationReceipt(learner.period_recommendations, receipt.period_recommendations, submitted),
       recommendations_acknowledged_at: Date.now(),
     } : learner),
   }));
@@ -1772,7 +1772,7 @@ async function performOutboxSync() {
         }
 
         if (userId > 0 && entry.kind === "save_learner_recommendations") {
-          await rememberLearnerRecommendations(userId, body.class_section_id, data);
+          await rememberLearnerRecommendations(userId, body.class_section_id, data, body.recommendations);
         }
         if (userId > 0 && entry.kind === "save_assessment_records") {
           const savedRecords = Array.isArray(data?.assessments)
@@ -3553,7 +3553,7 @@ export default function OfflineRuntime() {
 
           if (offlineSessionActive && pathname === "/api/assessment" && action === "save_learner_recommendations") {
             const receipt = await readResponseJson(response);
-            await rememberLearnerRecommendations(Number(tokenSession.user.id), body.class_section_id, receipt)
+            await rememberLearnerRecommendations(Number(tokenSession.user.id), body.class_section_id, receipt, body.recommendations)
               .catch(() => { /* The cloud save has already succeeded. */ });
           }
 

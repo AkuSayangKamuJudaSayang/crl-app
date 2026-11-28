@@ -1,4 +1,4 @@
-import { applyLearnerRecommendationChanges, readLearnerRecommendations, validateLearnerRecommendationChanges } from "../../../lib/learnerRecommendations.mjs";
+import { applyLearnerRecommendationChanges, readLearnerFollowUp, validateLearnerRecommendationChanges } from "../../../lib/learnerRecommendations.mjs";
 import { offlineAssessmentEvidence, matchesCompletedAssessment } from "../../../lib/offlineAssessmentEvidence.mjs";
 import {getAuthenticatedUser as getCurrentTeacher} from '../../../lib/auth';
 import {withSchoolScope} from '../../../lib/prisma';
@@ -2035,7 +2035,7 @@ async function assessmentRead(
         learners:
           learners.map(learner => ({
             ...serializeLearner(learner),
-            period_recommendations: readLearnerRecommendations(learner.periodRecommendations),
+            period_recommendations: readLearnerFollowUp(learner.periodRecommendations),
           })),
       });
     }

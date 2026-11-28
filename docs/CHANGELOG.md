@@ -1,5 +1,36 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-29.2 — Learner recommendation overlay
+
+Date: 29 November 2026, Asia/Manila.
+
+The Recommendations and Interventions tile uses the shared menu font. The
+section workspace places learner search, period, profile and recommendation
+filters beside a list that includes LRN and sex. The columns stack on phones.
+Conduct Assessment returns to its four roster columns without a remarks field.
+
+Opening a learner shows a modal. Select individual interventions or all
+profile-based options. The optional generator creates editable activity text.
+A dirty close offers Keep editing, Discard, or Save. The link opens DepEd
+reading guidance. The follow-up workbook includes selected interventions
+alongside the original recommendation text column.
+
+The existing recommendation JSON keeps period text at the same keys and adds
+an optional intervention map by period. Existing text, archived histories,
+and offline queues remain supported. The server and cache apply scoped
+acknowledgements to avoid overwriting changes from another period. No schema
+migration is required. A rollback retains text, but an older application may
+omit the selections from reports or discard them when rewriting the record.
+Updated the menu, roster, follow-up workspace and editor, shared models,
+assessment API, archive serialization, offline runtime, export, regression
+checks, and PWA shell v134. Release target is GitHub main and Railway production.
+
+Clean npm install, zero-finding dependency audit, full regression suite and
+optimized build passed. Chromium with synthetic learners verified 320, 390,
+800 and 1440 px layouts, name/LRN search, selection and generation, unsaved
+confirmation and focus, filtered export, saved-data compatibility, failed-save
+retry, and offline intervention selections replayed on reconnect.
+
 ## CRL-2026-11-29.1 — Recommendations and Interventions workspace
 
 Date: 29 November 2026, Asia/Manila.

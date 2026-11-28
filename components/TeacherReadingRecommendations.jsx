@@ -1,25 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import LearnerRecommendationEditor from "./LearnerRecommendationEditor";
 import Select from "./Select";
 import { downloadBlob } from "../lib/downloadFile";
-import { READING_PROFILE_LABELS, formatName } from "../lib/recordViewModel.mjs";
-import { readLearnerRecommendations } from "../lib/learnerRecommendations.mjs";
+import { READING_PROFILE_LABELS, formatName, profileClass } from "../lib/recordViewModel.mjs";
+import { readLearnerInterventions, readLearnerRecommendations } from "../lib/learnerRecommendations.mjs";
+import { readingInterventionLabels } from "../lib/readingInterventions.mjs";
 import { matchesReadingFollowUp } from "../lib/readingFollowUp.mjs";
 import { learnerPeriodProfile } from "../lib/learnerPeriodResults.mjs";
 import { buildReadingFollowUpReport } from "../lib/readingFollowUpExport";
 
-export default function TeacherReadingRecommendations({ learners, results, periods, section, year, readOnly, getDraft, onDraftChange, onSave, onError }) {
+export default function TeacherReadingRecommendations({ learners, results, periods, section, year, readOnly, onSave, onError }) {
   const [period, setPeriod] = useState(periods[0]);
   const [profile, setProfile] = useState("Low Emerging Reader");
   const [recommendation, setRecommendation] = useState("");
-  const [openLearnerId, setOpenLearnerId] = useState(null);
+  const [search, setSearch] = useState("");
+  const searchField = useRef(null);
+  const [target, setTarget] = useState(null);
   const [exporting, setExporting] = useState(false);
   const visible = useMemo(() => learners
-    .filter(learner => matchesReadingFollowUp(learner, results.get(String(learner.id))?.[period], period, profile, recommendation))
+    .filter(learner => matchesReadingFollowUp(learner, results.get(String(learner.id))?.[period], period, profile, recommendation, search))
     .sort((left, right) => formatName(left).localeCompare(formatName(right))),
-  [learners, results, period, profile, recommendation]);
+  [learners, results, period, profile, recommendation, search]);
 
   async function exportReport() {
     if (exporting || !visible.length) return;
@@ -35,15 +38,16 @@ export default function TeacherReadingRecommendations({ learners, results, perio
   }
 
   return (
-    <section className="panel recommendationsPanel" aria-label="Reading recommendations">
-      <div className="panelHeader recommendationsHeader">
-        <h2>{section}</h2>
-        <span>{year}{readOnly ? " · Read-only" : ""}</span>
-      </div>
-      <div className="readingFollowUpBar">
+    <div className="recommendationsWorkspace">
+      <aside className="panel recommendationFilters" aria-label="Recommendation filters">
+        <h2>Filters</h2>
+        <label>
+          <span>Learner name or LRN</span>
+          <input ref={searchField} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search learners"/>
+        </label>
         <label>
           <span>Assessment timeline</span>
-          <Select aria-label="Assessment timeline" value={period} onChange={event => { setPeriod(event.target.value); setOpenLearnerId(null); }}>
+          <Select aria-label="Assessment timeline" value={period} onChange={event => setPeriod(event.target.value)}>
             {periods.map(item => <option key={item} value={item}>{item}</option>)}
           </Select>
         </label>
@@ -63,45 +67,60 @@ export default function TeacherReadingRecommendations({ learners, results, perio
             <option value="without">Without recommendation</option>
           </Select>
         </label>
-        <button type="button" className="toolbarButton readingFollowUpExport" disabled={!visible.length || exporting} onClick={exportReport}>
-          {exporting ? "Preparing report…" : "Export follow-up report"}
-        </button>
-      </div>
-      <p className="recommendationsCount" role="status">{visible.length} {visible.length === 1 ? "learner" : "learners"}</p>
-      {!visible.length && <p className="recommendationsEmpty">No learners match these filters.</p>}
-      <ul className="recommendationsList">
-        {visible.map(learner => {
-          const name = formatName(learner);
-          const saved = readLearnerRecommendations(learner.period_recommendations)[period] ?? "";
-          const learnerProfile = learnerPeriodProfile(results.get(String(learner.id))?.[period]);
-          const open = openLearnerId === learner.id && !readOnly;
-          return (
-            <li key={learner.id} className="recommendationCard">
-              <div className="recommendationCardHeader">
-                <div>
-                  <strong>{name}</strong>
-                  <p>{learnerProfile || "No reading profile yet"}</p>
-                </div>
-                {!readOnly && <button type="button" className="toolbarButton" aria-expanded={open} aria-label={`Intervention for ${name}`} onClick={() => setOpenLearnerId(open ? null : learner.id)}>{open ? "Close" : "Open"}</button>}
-              </div>
-              {open ? (
-                <LearnerRecommendationEditor
-                  key={period}
-                  name={name}
-                  period={period}
-                  profile={learnerProfile}
-                  value={saved}
-                  draft={getDraft(learner, period) ?? saved}
-                  onDraftChange={text => onDraftChange(learner, period, text)}
-                  onSave={text => onSave(learner, period, text)}
-                  onCancel={() => onDraftChange(learner, period, undefined)}
-                  onClose={() => setOpenLearnerId(current => current === learner.id ? null : current)}
-                />
-              ) : <p className="recommendationCardNote">{saved || "No recommendation yet"}</p>}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+      </aside>
+      <section className="panel recommendationsPanel" aria-label="Reading recommendations">
+        <div className="panelHeader recommendationsHeader">
+          <div>
+            <h2>{section}</h2>
+            <p>{year}{readOnly ? " · Read-only" : ""}</p>
+          </div>
+          <button type="button" className="toolbarButton" disabled={!visible.length || exporting} onClick={exportReport}>
+            {exporting ? "Preparing report…" : "Export follow-up report"}
+          </button>
+        </div>
+        <p className="recommendationsCount" role="status">{visible.length} {visible.length === 1 ? "learner" : "learners"}</p>
+        {!visible.length && <p className="recommendationsEmpty">No learners match these filters.</p>}
+        {visible.length > 0 && (
+          <ul className="recommendationsList">
+            {visible.map(learner => {
+              const name = formatName(learner);
+              const saved = readLearnerRecommendations(learner.period_recommendations)[period] ?? "";
+              const selected = readLearnerInterventions(learner.period_recommendations, period);
+              const learnerProfile = learnerPeriodProfile(results.get(String(learner.id))?.[period]);
+              return (
+                <li key={learner.id} className="recommendationCard">
+                  <div className="recommendationCardHeader">
+                    <div>
+                      <strong>{name}</strong>
+                      <p>LRN: {learner.lrn || "—"} · Sex: {learner.sex || "—"}</p>
+                      <span className={learnerProfile ? `badge ${profileClass(learnerProfile)}` : ""}>{learnerProfile || "No reading profile yet"}</span>
+                    </div>
+                    {!readOnly && (
+                      <button type="button" className="toolbarButton" aria-haspopup="dialog" aria-label={`Open recommendation for ${name}`}
+                        onClick={event => setTarget({ learner, name, period, profile: learnerProfile, saved, selected, trigger: event.currentTarget })}>Open</button>
+                    )}
+                  </div>
+                  {selected.length > 0 && <p className="recommendationCardInterventions">{readingInterventionLabels(selected).join(" · ")}</p>}
+                  {(saved || !selected.length) && <p className="recommendationCardNote">{saved || "No recommendation yet"}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      {target && (
+        <LearnerRecommendationEditor
+          name={target.name}
+          period={target.period}
+          profile={target.profile}
+          value={target.saved}
+          selected={target.selected}
+          trigger={target.trigger}
+          fallbackFocus={searchField}
+          onSave={(text, ids) => onSave(target.learner, target.period, text, ids)}
+          onClose={() => setTarget(null)}
+        />
+      )}
+    </div>
   );
 }
