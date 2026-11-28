@@ -19,7 +19,6 @@ import RecordsPrintDialog from '../../components/RecordsPrintDialog';
 import {AnalyticsLearnerResultPanel,ReadingProfileProgressChart,AnalyticsPeriodChartDialog} from '../../components/SharedAssessmentResults';
 // Keep this file aligned with the working teacher dashboard baseline.
 
-import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
 import { acquirePageScrollLock } from "../../lib/pageScrollLock.mjs";
 import RosterSelectionActions from "../../components/RosterSelectionActions";
 import TeacherMenuIcon from "../../components/TeacherMenuIcon";
@@ -41,7 +40,8 @@ import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
 import { printReadingProfileAnalytics } from "../../lib/printAnalytics";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
-import DeleteLearnersDialog from "../../components/DeleteLearnersDialog";
+import ArchiveLearnersDialog from "../../components/ArchiveLearnersDialog";
+import { latestLearnerPeriodResults, learnerPeriodProfile, learnerPeriodStatus } from "../../lib/learnerPeriodResults.mjs";
 import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
 import { rosterRecords } from "../../lib/rosterRecords.mjs";
 import TeacherReports from "../../components/TeacherReports";
@@ -842,10 +842,6 @@ export default function TeacherPage() {
     setSortMode,
   ] = useState("name_asc");
 
-  const [
-    deleteTarget,
-    setDeleteTarget,
-  ] = useState(null);
 
   const [
     bulkDeleteConfirm,
@@ -1070,8 +1066,7 @@ export default function TeacherPage() {
   const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
   const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
   const [analyticsDetailsById, setAnalyticsDetailsById] = useState({});
-  const [analyticsDetailLoading, setAnalyticsDetailLoading] = useState(false);
-  const [analyticsDetailError, setAnalyticsDetailError] = useState("");
+
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
   const [analyticsChartFocus, setAnalyticsChartFocus] = useState(null);
   const [analyticsChartOverlayPeriod, setAnalyticsChartOverlayPeriod] = useState(null);
@@ -2100,6 +2095,8 @@ export default function TeacherPage() {
    */
   const classSummaryRows = useMemo(() => buildClassSummaryRows(learners,currentRecords), [currentRecords, learners]);
 
+  const learnerPeriodResults = useMemo(() => latestLearnerPeriodResults(assessments), [assessments]);
+
   const analyticsRows = useMemo(
     () => analyticsScope.assessments.map(assessment => buildAnalyticsRow(assessment,
       analyticsScope.learners.find(item => Number(item.id) === Number(assessment.learner_id)) || null)),
@@ -2156,38 +2153,24 @@ export default function TeacherPage() {
     });
   }, [analyticsAssessedRows, analyticsLearnerOptions, analyticsLearnerSearch, analyticsLearnerSort]);
 
-  const analyticsSelectedAssessment = useMemo(() => {
-    const matching = analyticsAssessedRows
-      .filter((row) =>
-        Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
-        row.assessment?.assessment_period === analyticsPeriod
-      )
-      .map((row) => row.assessment)
-      .sort((left, right) => new Date(right.assessment_date || 0) - new Date(left.assessment_date || 0));
-    return matching[0] || null;
-  }, [analyticsAssessedRows, analyticsLearnerId, analyticsPeriod]);
-
-  const analyticsSelectedAssessmentId = analyticsSelectedAssessment?.id || null;
   const analyticsSelectedLearner = analyticsLearnerOptions.find(
-    (learner) => String(learner.id) === String(analyticsLearnerId)
+    learner => String(learner.id) === String(analyticsLearnerId)
   ) || null;
-  const analyticsSelectedPeriods = PERIODS.filter((period) =>
-    analyticsAssessedRows.some((row) =>
-      Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
-      row.assessment?.assessment_period === period
-    )
-  );
-  const analyticsDetail = analyticsSelectedAssessmentId
-    ? analyticsDetailsById[String(analyticsSelectedAssessmentId)] ||
-      analyticsSelectedAssessment?.analytics_detail ||
-      null
-    : null;
+  const analyticsLearnerSectionId = analyticsSelectedLearner?.class_section_id ?? analyticsSelectedLearner?.classSectionId;
+  const analyticsPeriodResults = analyticsSelectedLearner
+    ? learnerPeriodResults.get(String(analyticsSelectedLearner.id))
+    : undefined;
+  const analyticsPeriodDetails = PERIODS.map(period => {
+    const result = analyticsPeriodResults?.[period];
+    const entry = analyticsDetailsById[String(result?.id)];
+    return { period, result, detail: entry?.detail, error: entry?.error, loading: Boolean(result?.is_completed && !entry) };
+  });
 
   const changeAnalyticsClass = useCallback((yearId, sectionId) => {
     setAnalyticsYearId(yearId); setAnalyticsSectionId(sectionId);
     setAnalyticsLearnerId(""); setAnalyticsLearnerSearch("");
     setAnalyticsChartFocus(null); setAnalyticsChartOverlayPeriod(null);
-    setAnalyticsMobileResultOpen(false); setAnalyticsDetailError("");
+    setAnalyticsMobileResultOpen(false);
   }, []);
   useEffect(() => {
     if (analyticsYearId && !analyticsScope.year) changeAnalyticsClass("", "");
@@ -2266,57 +2249,34 @@ export default function TeacherPage() {
   }, [analyticsLearnerId, analyticsLearnerOptions, selectAnalyticsLearner]);
 
   useEffect(() => {
-    if (!analyticsLearnerId) return;
-    const available = PERIODS.filter((period) =>
-      analyticsAssessedRows.some((row) =>
-        Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
-        row.assessment?.assessment_period === period
-      )
-    );
-    if (available.length && !available.includes(analyticsPeriod)) {
-      setAnalyticsPeriod(available[available.length - 1]);
-    }
-  }, [analyticsAssessedRows, analyticsLearnerId, analyticsPeriod]);
-
-  useEffect(() => {
+    if (!analyticsMobileResultOpen || !analyticsPeriodResults) return;
     let cancelled = false;
-    if (!["analytics","conduct","records"].includes(activeTab) || !analyticsSelectedAssessmentId) {
-      setAnalyticsDetailLoading(false);
-      setAnalyticsDetailError("");
-      return undefined;
-    }
-
-    if (analyticsDetail) {
-      setAnalyticsDetailLoading(false);
-      setAnalyticsDetailError("");
-      return undefined;
-    }
-
-    setAnalyticsDetailLoading(true);
-    setAnalyticsDetailError("");
-    api("get_assessment_detail", {
-      query: { assessment_id: analyticsSelectedAssessmentId, class_section_id: analyticsSectionId },
-    })
-      .then((data) => {
-        if (cancelled) return;
+    setAnalyticsDetailsById({});
+    for (const result of Object.values(analyticsPeriodResults)) {
+      if (!result.is_completed) continue;
+      const id = String(result.id);
+      const save = entry => {
+        if (!cancelled) setAnalyticsDetailsById(current => ({ ...current, [id]: entry }));
+      };
+      if (result.analytics_detail) {
+        save({ detail: { ...result, ...result.analytics_detail } });
+        continue;
+      }
+      api("get_assessment_detail", {
+        query: { assessment_id: result.id, class_section_id: analyticsLearnerSectionId },
+      }).then(data => {
         const detail = data?.assessment || data;
-        setAnalyticsDetailsById((current) => ({
-          ...current,
-          [String(analyticsSelectedAssessmentId)]: detail,
-        }));
-        setAnalyticsDetailLoading(false);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setAnalyticsDetailError(error?.message || "Unable to load this result.");
-          setAnalyticsDetailLoading(false);
+        if (String(detail?.id) !== id ||
+          String(detail.learner_id) !== String(result.learner_id) ||
+          detail.assessment_period !== result.assessment_period) {
+          save({ error: "Unable to match the saved result to this learner and period." });
+          return;
         }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, analyticsDetail, analyticsSelectedAssessmentId, analyticsSectionId, api]);
+        save({ detail });
+      }).catch(error => save({ error: error?.message || "Unable to load this result." }));
+    }
+    return () => { cancelled = true; };
+  }, [analyticsMobileResultOpen, analyticsPeriodResults, analyticsLearnerSectionId, api]);
 
   const exportAssessmentRecord =
     useCallback(
@@ -2747,157 +2707,6 @@ export default function TeacherPage() {
     }
   };
 
-  const deleteLearner =
-    async (confirmation) => {
-      if (
-        !deleteTarget || savingScoresheet
-      ) {
-        return false;
-      }
-      if (deletingRef.current) { showToast("Wait for the current deletion to finish before starting another.", "error"); return false; }
-
-      const nestedLearner =
-        deleteTarget.learner &&
-        typeof deleteTarget.learner ===
-          "object"
-          ? deleteTarget.learner
-          : {};
-
-      /*
-       * Resolve each value independently from both possible object shapes.
-       * Some legacy rows contain a nested learner object while the actual
-       * identity fields remain on deleteTarget itself.
-       */
-      const learnerId =
-        Number(
-          nestedLearner.id ??
-            nestedLearner.learner_id ??
-            nestedLearner.learnerId ??
-            deleteTarget.id ??
-            deleteTarget.learner_id ??
-            deleteTarget.learnerId ??
-            0
-        );
-
-      const learnerLrn =
-        String(
-          nestedLearner.lrn ??
-            nestedLearner.LRN ??
-            deleteTarget.lrn ??
-            deleteTarget.LRN ??
-            ""
-        ).trim();
-
-      const learnerName = {
-        last_name:
-          String(
-            nestedLearner.last_name ??
-              nestedLearner.lastName ??
-              deleteTarget.last_name ??
-              deleteTarget.lastName ??
-              ""
-          ).trim(),
-        first_name:
-          String(
-            nestedLearner.first_name ??
-              nestedLearner.firstName ??
-              deleteTarget.first_name ??
-              deleteTarget.firstName ??
-              ""
-          ).trim(),
-        middle_name:
-          String(
-            nestedLearner.middle_name ??
-              nestedLearner.middleName ??
-              deleteTarget.middle_name ??
-              deleteTarget.middleName ??
-              ""
-          ).trim(),
-      };
-
-      const payload = {
-        ...confirmation,
-        learner_id:
-          Number.isInteger(
-            learnerId
-          ) &&
-          learnerId !== 0
-            ? learnerId
-            : null,
-        learnerId:
-          Number.isInteger(
-            learnerId
-          ) &&
-          learnerId !== 0
-            ? learnerId
-            : null,
-        id:
-          Number.isInteger(
-            learnerId
-          ) &&
-          learnerId !== 0
-            ? learnerId
-            : null,
-        lrn:
-          learnerLrn ||
-          null,
-        LRN:
-          learnerLrn ||
-          null,
-        first_name:
-          learnerName.first_name ||
-          null,
-        last_name:
-          learnerName.last_name ||
-          null,
-        middle_name:
-          learnerName.middle_name ||
-          null,
-        learner: {
-          ...nestedLearner,
-          id:
-            Number.isInteger(
-              learnerId
-            ) &&
-            learnerId !== 0
-              ? learnerId
-              : null,
-          learner_id:
-            Number.isInteger(
-              learnerId
-            ) &&
-            learnerId !== 0
-              ? learnerId
-              : null,
-          learnerId:
-            Number.isInteger(
-              learnerId
-            ) &&
-            learnerId !== 0
-              ? learnerId
-              : null,
-          lrn:
-            learnerLrn ||
-            null,
-          LRN:
-            learnerLrn ||
-            null,
-          first_name:
-            learnerName.first_name ||
-            null,
-          last_name:
-            learnerName.last_name ||
-            null,
-          middle_name:
-            learnerName.middle_name ||
-            null,
-        },
-      };
-
-      setDeleteTarget(null);
-      return processLearnerDeletions([{id:learnerId, name:[learnerName.first_name,learnerName.last_name].filter(Boolean).join(" "), action:"delete_learner", body:payload}], selectedSectionId);
-    };
-
   const toggleLearnerSelection = (learnerId) => {
     const id = Number(learnerId);
     if (!Number.isInteger(id) || id === 0) return;
@@ -2927,7 +2736,7 @@ export default function TeacherPage() {
       .filter((id) => Number.isInteger(id) && id !== 0);
 
     if (!ids.length) {
-      showToast("Select at least one learner to delete.", "error");
+      showToast("Select at least one learner to archive.", "error");
       return;
     }
 
@@ -2936,7 +2745,7 @@ export default function TeacherPage() {
       return;
     }
 
-    if (deletingRef.current || savingScoresheet) { showToast("Wait for the current deletion to finish before starting another.", "error"); return false; }
+    if (deletingRef.current || savingScoresheet) { showToast("Wait for the current archive operation to finish.", "error"); return false; }
     const jobs = confirmation.jobs;
     if (!Array.isArray(jobs) || jobs.length !== ids.length || jobs.some(job => !ids.includes(job.id))) return false;
     setBulkDeleteConfirm(false);
@@ -2954,14 +2763,14 @@ export default function TeacherPage() {
       const body = {...job.body, class_section_id:sectionId, ...(job.action === "delete_learners" ? {learner_ids:[job.id]} : {})};
       try {
         const result = await withLearnerDeletionRetry(() => api(job.action, {method:"POST", body}));
-        if (job.action === "delete_learners" && !result.deleted_learner_ids?.map(Number).includes(job.id) && !result.already_deleted_count) throw Error("Deletion was not acknowledged. Retry this learner.");
+        if (job.action === "delete_learners" && !result.deleted_learner_ids?.map(Number).includes(job.id) && !result.already_deleted_count) throw Error("Archiving was not acknowledged. Retry this learner.");
         pendingSync ||= Boolean(result.offline);
         deleted.add(job.id);
         setLearners(current=>current.filter(item=>Number(item.id)!==job.id));
         setAssessments(current=>current.filter(item=>Number(item.learner_id ?? item.learnerId)!==job.id));
         setSelectedLearnerIds(current=>current.filter(id=>id!==job.id));
       } catch (error) {
-        failures.push({...job, body, error:error?.message || "Unable to delete this learner. Try again."});
+        failures.push({...job, body, error:error?.message || "Unable to archive this learner. Try again."});
       }
       completed++;
       setDeletingProgress(publish(true));
@@ -2972,7 +2781,7 @@ export default function TeacherPage() {
     const finished=publish(false);
     setDeletingProgress(finished);
     if (!failures.length) {
-      showToast(pendingSync ? `${deleted.size} removed locally. Synchronization pending.` : `${deleted.size} learner(s) deleted successfully.`);
+      showToast(pendingSync ? `${deleted.size} archived locally. Synchronization pending.` : `${deleted.size} learner(s) archived successfully.`);
       window.setTimeout(()=>setDeletingProgress(current=>current===finished ? null : current),1200);
     }
     return failures.length === 0;
@@ -3169,8 +2978,6 @@ export default function TeacherPage() {
         setProfileEditOpen(false);
       } else if (detailsTarget) {
         setDetailsTarget(null);
-      } else if (deleteTarget) {
-        setDeleteTarget(null);
       } else if (bulkDeleteConfirm) {
         setBulkDeleteConfirm(false);
       } else if (addLearnerOpen && !savingLearner) {
@@ -3206,7 +3013,6 @@ export default function TeacherPage() {
     bulkDeleteConfirm,
     closeBento,
     classBack,
-    deleteTarget,
     detailsTarget,
     loggingOut,
     logoutOpen,
@@ -10824,13 +10630,7 @@ export default function TeacherPage() {
           .teacherShell.isExpanded .topbar { padding: 10px 14px !important; }
         }
 
-        /* ==================================================================
-           MOBILE TABLES
-           Only the Enrolled Learners roster (fixed 7 columns) becomes a card
-           list, because it is the one table whose columns have known labels.
-           Every other table keeps its real structure and scrolls sideways with
-           its headers aligned, instead of collapsing into unlabelled rows.
-           ================================================================== */
+        /* Keep table headers aligned while scrolling on smaller screens. */
         @media (max-width: 900px) {
           .tableWrap,
           .summaryTableWrap,
@@ -10931,54 +10731,7 @@ export default function TeacherPage() {
           }
         }
 
-        /* phones: the roster becomes a labelled card list; the bento grid and
-           header actions keep their compact layout. */
         @media (max-width: 640px) {
-          .learnerRoster table {
-            min-width: 0 !important;
-            width: 100% !important;
-          }
-
-          .learnerRoster thead { display: none !important; }
-
-          .learnerRoster tbody tr {
-            display: block !important;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--crl-line) !important;
-          }
-
-          .learnerRoster tbody td {
-            display: flex !important;
-            align-items: center;
-            justify-content: space-between;
-            gap: 14px;
-            border: 0 !important;
-            padding: 6px 2px !important;
-            text-align: right;
-            white-space: normal !important;
-          }
-
-          .learnerRoster tbody td::before {
-            flex: 0 0 auto;
-            color: var(--crl-muted);
-            font-size: 11px;
-            font-weight: 800;
-            text-align: left;
-          }
-
-          .learnerRoster tbody td:nth-child(1)::before { content: "Select"; }
-          .learnerRoster tbody td:nth-child(2)::before { content: "LRN"; }
-          .learnerRoster tbody td:nth-child(3)::before { content: "Last Name"; }
-          .learnerRoster tbody td:nth-child(4)::before { content: "First Name"; }
-          .learnerRoster tbody td:nth-child(5)::before { content: "Middle Initial"; }
-          .learnerRoster tbody td:nth-child(6)::before { content: "Suffix"; }
-          .learnerRoster tbody td:nth-child(7)::before { content: "Sex"; }
-          .learnerRoster tbody td:nth-child(8)::before { content: "Status"; }
-          .learnerRoster tbody td:nth-child(9)::before { content: "Actions"; }
-          .learnerRoster tbody td:nth-child(8),.learnerRoster tbody td:nth-child(9){align-items:flex-start}
-          .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
-          .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
-
           /* On phones let the row box grow instead of nesting a second scroll. */
           .bentoHome .latestLearnerOverviewTable {
             max-height: none !important;
@@ -12563,14 +12316,28 @@ export default function TeacherPage() {
         .conductRosterHeader .learnerRefreshButton{width:44px;height:44px;min-height:44px}
         .conductRosterHeading{text-align:center;overflow-wrap:anywhere}
         .conductClassContext{font-size:16px;gap:3px;margin-bottom:5px;line-height:1.35}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
-        .learnerRoster table{min-width:1050px;width:100%}.learnerRoster th{font:700 13px/1.4 Arial,Helvetica,sans-serif}.learnerRoster td{font:400 15px/1.5 Arial,Helvetica,sans-serif}.learnerRoster td.nameStrong{font-weight:700}
+        .learnerRoster { overflow-x:auto; overscroll-behavior-inline:contain; isolation:isolate; margin:16px; }
+        .learnerRoster table { width:100%!important; min-width:700px!important; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+        .learnerRoster :is(th,td) { padding:12px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
+        .learnerRoster .rosterIdentity { position:sticky; left:0; z-index:1; width:clamp(150px, 31vw, 250px); padding:12px; background:var(--crl-surface); box-shadow:1px 0 var(--crl-line); }
+        .learnerRoster thead .rosterIdentity { background:var(--crl-surface-2); }
+        .learnerRoster .rosterIdentityHeader,.learnerRoster .rosterLearner { display:flex; align-items:center; gap:8px; }
+        .learnerRoster .rosterLearner input,.learnerRoster .rosterIdentityHeader input { flex:none; margin:0; }
+        .learnerRoster .rosterLearnerDetails { min-width:0; display:grid; gap:4px; }
+        .learnerRoster .rosterLearnerDetails small,.learnerRoster .rosterPeriod > span { color:var(--crl-muted); font-size:13px; }
+        .learnerRoster .rosterPeriod .badge { display:block; width:fit-content; margin-top:8px; white-space:normal; }
+        .learnerRoster .inlineActions { margin-top:8px; gap:6px; }
+        .learnerRoster:focus-visible { outline:2px solid var(--crl-active-bg,#3978b5); outline-offset:3px; }
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:68px;padding:10px 14px!important;font:700 14px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.primary{background:#287c55!important;border-color:#287c55!important;color:#fff!important}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#e9f2ff!important;border-color:#a8c4e9!important;color:#24568c!important}
         html[data-crl-theme="dark"] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#24384e!important;color:#c8ddff!important;border-color:#42618a!important}
 
-        @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
-        @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
+        @media(max-width:640px){
+          .learnerRoster { margin:10px; }
+          html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:0; padding:8px!important; flex:1; }
+        }
+        @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])){background:var(--crl-surface-2)}}
         .rosterSelectionInline{display:contents}
         @media(max-width:768px){
@@ -12587,8 +12354,9 @@ export default function TeacherPage() {
         html[data-crl-theme] .learnerRoster tbody tr,
         html[data-crl-theme] .learnerRoster tbody tr:hover,
         html[data-crl-theme] .learnerRoster tbody tr:hover td{background:transparent!important;box-shadow:none;transform:none}
-        html[data-crl-theme] .learnerRoster tbody tr.selectedRow td,
-        html[data-crl-theme] .learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2,#f3f6fa)!important}
+        html[data-crl-theme] .learnerRoster tbody tr:hover .rosterIdentity{background:var(--crl-surface)!important}
+        html[data-crl-theme] .learnerRoster tbody tr.selectedRow :is(th,td),
+        html[data-crl-theme] .learnerRoster tbody tr.selectedRow:hover :is(th,td){background:var(--crl-surface-2,#f3f6fa)!important}
 
         /* The roster toolbar wraps within its card, including during selection. */
         .teacherShell.hasConductRoster,.teacherShell.hasConductRoster .main,.teacherShell.hasConductRoster .content,.teacherShell.hasConductRoster .contentStage,.teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}
@@ -12982,7 +12750,7 @@ export default function TeacherPage() {
                         </option>
                       </Select>
 
-                      <div className="conductRosterActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData(true)}/><div className="conductSelectionActions"><button type="button" className="toolbarButton" disabled={!filteredLearners.length} onClick={selectAllFilteredLearners}>Select all</button><button type="button" className="toolbarButton" disabled={!selectedLearnerIds.length} onClick={clearLearnerSelection}>Deselect all</button><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div></div>
+                      <div className="conductRosterActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData(true)}/><div className="conductSelectionActions"><button type="button" className="toolbarButton" disabled={!filteredLearners.length} onClick={selectAllFilteredLearners}>Select all</button><button type="button" className="toolbarButton" disabled={!selectedLearnerIds.length} onClick={clearLearnerSelection}>Deselect all</button><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Archive selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div></div>
                     </div>
                     )}
 
@@ -13003,151 +12771,70 @@ export default function TeacherPage() {
                         </p>
                       </div>
                     ) : (
-                      <div
-                        style={{
-                          padding:
-                            16,
-                        }}
-                      >
-                        <div className="tableWrap learnerRoster">
+                        <div className="tableWrap learnerRoster" role="region" aria-label="Enrolled learners by assessment period" tabIndex={0}>
                           <table>
                             <thead>
                               <tr>
-                                <th><input type="checkbox" aria-label="Select all visible learners" checked={filteredLearners.length>0&&filteredLearners.every(l=>selectedLearnerIds.includes(Number(l.id)))} onChange={e=>setSelectedLearnerIds(e.target.checked?filteredLearners.map(l=>Number(l.id)):[])}/></th>
-                                <th>
-                                  LRN
+                                <th scope="col" className="rosterIdentity">
+                                  <div className="rosterIdentityHeader">
+                                    <input
+                                      type="checkbox"
+                                      aria-label="Select all visible learners"
+                                      checked={filteredLearners.every(learner => selectedLearnerIds.includes(Number(learner.id)))}
+                                      onChange={event => event.target.checked ? selectAllFilteredLearners() : clearLearnerSelection()}
+                                    />
+                                    Learner
+                                  </div>
                                 </th>
-
-                                <th>Last Name</th><th>First Name</th><th>Middle Initial</th><th>Suffix</th>
-
-                                <th>
-                                  Sex
-                                </th>
-
-                                <th>
-                                  Status
-                                </th>
-
-                                <th>
-                                  Actions
-                                </th>
+                                {PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}
                               </tr>
                             </thead>
-
                             <tbody>
-                              {filteredLearners.map(
-                                (
-                                  learner
-                                ) => {
-                                  const status =
-                                    statusForLearner(
-                                      learner.id,
-                                      assessments
-                                    );
-
-                                  const rows =
-                                    assessments.filter(
-                                      (
-                                        item
-                                      ) =>
-                                        Number(
-                                          item.learner_id
-                                        ) ===
-                                        Number(
-                                          learner.id
-                                        )
-                                    );
-
-                                  const bosyDone =
-                                    rows.some(
-                                      (
-                                        item
-                                      ) =>
-                                        item
-                                          .assessment_period ===
-                                          "BoSY" &&
-                                        item.is_completed
-                                    );
-
-                                  const mosyDone =
-                                    rows.some(
-                                      (
-                                        item
-                                      ) =>
-                                        item
-                                          .assessment_period ===
-                                          "MoSY" &&
-                                        item.is_completed
-                                    );
-
-                                  const eosyDone =
-                                    rows.some(
-                                      (
-                                        item
-                                      ) =>
-                                        item
-                                          .assessment_period ===
-                                          "EoSY" &&
-                                        item.is_completed
-                                    );
-
-                                  return (
-                                    <tr
-                                      key={
-                                        learner.id
-                                      }
-                                      className={
-                                        selectedLearnerIds.includes(Number(learner.id))
-                                          ? "selectedRow"
-                                          : ""
-                                      }
-                                    >
-                                      <td><input type="checkbox" aria-label={`Select ${learner.first_name||learner.firstName} ${learner.last_name||learner.lastName}`} checked={selectedLearnerIds.includes(Number(learner.id))} onChange={()=>toggleLearnerSelection(learner.id)}/></td>
-                                      <td>
-                                        {
-                                          learner.lrn
-                                        }
-                                      </td>
-
-                                      <td className="nameStrong">{learner.last_name ?? learner.lastName ?? ""}</td>
-                                      <td className="nameStrong">{learner.first_name ?? learner.firstName ?? ""}</td>
-                                      <td>{learnerMiddleInitial(learner)}</td>
-                                      <td>{learner.suffix || "—"}</td>
-
-                                      <td>
-                                        {
-                                          learner.sex
-                                        }
-                                      </td>
-
-                                      <td>
-                                        <span
-                                          className={`badge ${profileClass(
-                                            status.label
-                                          )}`}
-                                        >
-                                          {
-                                            status.label
-                                          }
-                                        </span>
-                                      </td>
-
-                                      <td>
-                                        <div className="inlineActions">
-
-                                          <button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(liveTimelineIssue(period)||periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
-                                          <button type="button" className="smallButton dangerButton" disabled={classReadonly||Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onClick={()=>setDeleteTarget(learner)}>Delete</button>
+                              {filteredLearners.map(learner => {
+                                const name = formatName({
+                                  ...learner,
+                                  first_name: learner.first_name ?? learner.firstName,
+                                  last_name: learner.last_name ?? learner.lastName,
+                                  middle_name: learner.middle_name ?? learner.middleName,
+                                });
+                                const selected = selectedLearnerIds.includes(Number(learner.id));
+                                const results = learnerPeriodResults.get(String(learner.id));
+                                return (
+                                  <tr key={learner.id} className={selected ? "selectedRow" : ""}>
+                                    <th scope="row" className="rosterIdentity">
+                                      <div className="rosterLearner">
+                                        <input type="checkbox" aria-label={`Select ${name}`} checked={selected} onChange={() => toggleLearnerSelection(learner.id)} />
+                                        <div className="rosterLearnerDetails">
+                                          <strong>{name}</strong>
+                                          <small>LRN {learner.lrn}{learner.sex && ` · ${learner.sex}`}</small>
                                         </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                }
-                              )}
+                                      </div>
+                                      <div className="inlineActions">
+                                        <button type="button" className="smallButton learnerViewButton" onClick={() => {
+                                          setAnalyticsYearId(selectedClass.schoolYearId);
+                                          setAnalyticsSectionId(selectedClass.id);
+                                          selectAnalyticsLearner(learner.id);
+                                          setAnalyticsMobileResultOpen(true);
+                                        }}>View</button>
+                                        <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period => Boolean(liveTimelineIssue(period) || periodEligibility(assessments, learner.id, period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
+                                      </div>
+                                    </th>
+                                    {PERIODS.map(period => {
+                                      const result = results?.[period];
+                                      const profile = learnerPeriodProfile(result);
+                                      return (
+                                        <td key={period} className="rosterPeriod">
+                                          <span>{learnerPeriodStatus(result)}</span>
+                                          {profile && <strong className={`badge ${profileClass(profile)}`}>{profile}</strong>}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
-                      </div>
                     )}
                   </div>
                 </>
@@ -13469,7 +13156,24 @@ export default function TeacherPage() {
             )
           : null}
 
-        {analyticsMobileResultOpen && <ClassDialog wide showClose title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail} section={classCatalog.sections.find(item=>item.id === (analyticsSelectedLearner?.class_section_id ?? analyticsSelectedLearner?.classSectionId))} year={analyticsScope.year} teacher={user} onPrintError={message=>showToast(message,'error')}/></ClassDialog>}
+        {analyticsMobileResultOpen && (
+          <ClassDialog wide showClose title="Learner results" onClose={() => setAnalyticsMobileResultOpen(false)}>
+            <div className="sharedAssessmentResults">
+              <AnalyticsLearnerResultPanel
+                key={analyticsLearnerId}
+                selectedLearner={analyticsSelectedLearner}
+                periodResults={analyticsPeriodDetails}
+                period={analyticsPeriod}
+                onPeriodChange={setAnalyticsPeriod}
+                initialSummary={activeTab === "conduct"}
+                section={classCatalog.sections.find(item => item.id === analyticsLearnerSectionId)}
+                year={analyticsScope.year}
+                teacher={user}
+                onPrintError={message => showToast(message, "error")}
+              />
+            </div>
+          </ClassDialog>
+        )}
 
         {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
@@ -13741,8 +13445,7 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {bulkDeleteConfirm && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learners" key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
-        {deleteTarget && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learner" key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
+        {bulkDeleteConfirm && <ArchiveLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
 
         {detailsTarget && (
           <div
@@ -14886,7 +14589,7 @@ export default function TeacherPage() {
           <div className="deletingToast" role="status" aria-live="polite">
             <div className="deletingToastIcon"><span /></div>
             <div className="deletingToastCopy">
-              <strong>{deletingProgress.active ? "Deleting learners…" : deletingProgress.failed ? "Some learners could not be deleted" : "Deletion processing complete"}</strong>
+              <strong>{deletingProgress.active ? "Archiving learners…" : deletingProgress.failed ? "Some learners could not be archived" : "Archiving complete"}</strong>
               <span>{deletingProgress.completed} of {deletingProgress.total} processed{deletingProgress.failed ? ` · ${deletingProgress.failed} failed` : ""}{deletingProgress.pendingSync ? " · Sync pending" : ""}</span>
               {deletingProgress.failures?.length > 0 && <ul style={{margin:0,paddingLeft:18,maxHeight:160,overflowY:"auto",fontSize:12}}>{deletingProgress.failures.map(item=><li key={item.id}><strong>{item.name || "Selected learner"}</strong>: {item.error}</li>)}</ul>}
               {!deletingProgress.active && deletingProgress.failed > 0 && <div style={{display:"flex",gap:8}}><button type="button" className="smallButton" onClick={()=>void processLearnerDeletions(deletingProgress.failures,deletingProgress.sectionId)}>Retry failed</button><button type="button" className="smallButton" onClick={()=>setDeletingProgress(null)}>Dismiss</button></div>}

@@ -1,5 +1,31 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-28.1 — Learner period results and roster archiving
+
+Date: 28 November 2026, Asia/Manila.
+
+Conduct Assessment now keeps the learner name, LRN, sex, checkbox, View and
+Start in a pinned column beside the BoSY, MoSY and EoSY status and profile
+columns. Teachers archive from checkbox selection. A short password-confirmed
+dialog offers preset reasons and an optional custom reason. The existing
+encrypted learner archive, retention, signed authorization, offline queue and
+per-learner acknowledgements remain in use.
+
+The learner results overlay adds a Summary with period status, saved profiles,
+reading metrics and recorded miscues by type. Missing evidence and tasks
+stopped by the assessment rules remain distinct from recorded zeroes.
+Individual period evidence, printing and Excel exports remain available.
+
+Updated the teacher workspace, archive dialog, shared and coordinator learner
+results, period result view model, scoped styles, PWA shell v129, and regression
+checks. Clean install, security audit with zero findings, the entire assessment
+regression suite and production build passed. Synthetic Chromium checks covered
+pinned scrolling, archive controls and reasons, online/offline signed
+confirmations, learner isolation and period comparison across 320, 390, 800 and
+1440 px in light and dark themes. No schema migration or production learner
+write was needed for verification. The release can be rolled back at the
+application level without rewriting saved results or archives.
+
 ## CRL-2026-11-22.1 — Offline assessment sync on reconnect
 
 Date: 22 November 2026, Asia/Manila.

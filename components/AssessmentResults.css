@@ -1002,3 +1002,74 @@ html[data-crl-theme] .analyticsIndividualPrint button.toolbarButton.individualEx
 @media(hover:hover) and (pointer:fine){:is(.analyticsRedesign,.sharedAssessmentResults) .analyticsPeriodGroup[role=button]:hover{background:var(--crl-soft,#f2f6fb);box-shadow:0 0 0 1px var(--crl-line,#dbe3ee)}}
 :is(.analyticsRedesign,.sharedAssessmentResults) .analyticsBarButton,:is(.analyticsRedesign,.sharedAssessmentResults) .analyticsBarButton:hover,:is(.analyticsRedesign,.sharedAssessmentResults) .analyticsBarButton:active{transform:none;cursor:inherit;pointer-events:none}
 .analyticsIndividualPrint{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}.analyticsIndividualPrint>small{flex-basis:100%;font-size:12px;line-height:1.5;color:var(--crl-muted,#637389)}.analyticsIndividualPrint button.toolbarButton{min-height:44px;max-width:100%}
+
+.learnerResultHeader {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.learnerResultHeader > div:first-child > strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.learnerResultHeader .analyticsPeriodSwitch {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.learnerResultHeader .analyticsPeriodSwitch button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.learnerResultHeader .analyticsPeriodSwitch button:focus-visible {
+  outline: 2px solid #568cd1;
+  outline-offset: -3px;
+}
+@media (hover:hover) {
+  .learnerResultHeader .analyticsPeriodSwitch button:hover:not(.active) {
+    background: var(--crl-soft);
+    color: var(--crl-ink);
+  }
+}
+.learnerPeriodSummary { display: grid; gap: 18px; min-width: 0; }
+.learnerComparisonScroll {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--crl-line);
+  border-radius: 10px;
+}
+.learnerComparisonScroll:focus-visible { outline: 2px solid #568cd1; outline-offset: 2px; }
+.learnerComparisonTable {
+  min-width: 470px;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+  color: var(--crl-text);
+}
+.learnerComparisonTable caption {
+  padding: 13px;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--crl-ink);
+}
+.learnerComparisonTable :is(th, td) {
+  background: var(--crl-surface);
+  padding: 10px 12px;
+  border-top: 1px solid var(--crl-line);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.learnerComparisonTable thead th { background: var(--crl-soft); }
+.learnerComparisonTable tr > th:first-child { width: 29%; }
+.learnerComparisonTable tbody th { font-weight: 650; color: var(--crl-ink); }
+.learnerComparisonTable tbody tr:nth-child(even) :is(th, td) { background: var(--crl-soft); }
+.learnerPeriodHeading { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-bottom:14px; color:var(--crl-ink); }
+.learnerPeriodHeading h3 { margin:0; font-size:16px; }
+.learnerPeriodHeading > span { padding:5px 9px; border-radius:999px; background:var(--crl-soft); color:var(--crl-muted); font-size:13px; }
+.learnerPeriodHeading > strong { font-size:14px; }
+@media (max-width: 600px) {
+  .learnerResultHeader .analyticsPeriodSwitch { display:grid; width:100%; }
+  .learnerResultHeader .analyticsPeriodSwitch button { padding-inline:4px; }
+  .learnerPeriodSummary { gap:12px; }
+}

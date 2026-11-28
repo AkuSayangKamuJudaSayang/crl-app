@@ -57,3 +57,6 @@
 @media(max-width:600px){.importActions>button{flex:1;min-width:0}}
 :global(html[data-crl-theme=dark]) .dialog{background:var(--crl-surface);color:var(--crl-text)}
 .startNotice{padding:16px 18px;border:1px solid var(--crl-line,#c9dbef);border-radius:12px;background:var(--crl-surface-2,#edf5fd);color:var(--crl-text,#24568c)!important}
+
+.archiveLearnersForm > p:first-child { margin:0 0 18px; }
+.archiveLearnersForm label > :global([data-crl-select]) { width:100%; }

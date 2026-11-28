@@ -4,10 +4,11 @@ import {downloadBlob} from '../lib/downloadFile';
 import WorkspaceLoading from './WorkspaceLoading';
 import {getStoryQuestions} from '../lib/storyComprehension.mjs';
 import {getPossibleStoryAnswer} from '../lib/storyAnswerGuides.mjs';
-import {formatName,getRecordProfile,READING_PROFILE_LABELS} from '../lib/recordViewModel.mjs';
+import {formatName,getRecordProfile,hasRecordedPassageAssessment,READING_PROFILE_LABELS} from '../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../lib/profileComparison.mjs';
 import {printAssessmentElement,CLEAN_PRINT_HINT} from '../lib/printRecords';
 import {canPrintIndividualResult,buildIndividualLearnerReport,createIndividualLearnerReport,INDIVIDUAL_REPORT_PRINT_CSS} from '../lib/individualLearnerReport.mjs';
+import {countLearnerMiscues, learnerPeriodProfile, learnerPeriodStatus} from '../lib/learnerPeriodResults.mjs';
 import './AssessmentResults.css';
 const PERIODS=["BoSY","MoSY","EoSY"];
 const PERIOD_MEANINGS = {
@@ -474,28 +475,110 @@ function LearnerAssessmentEvidence({ detail }) {
                 </div>
               ))}
             </div>
-          ) : <div className="analyticsEvidenceEmpty">No miscues recorded.</div>}
+          ) : <div className="analyticsEvidenceEmpty">{Array.isArray(detail.passage_miscues) ? "No miscues recorded." : "Miscue details unavailable."}</div>}
         </section>
       </div>
     </div>
   );
 }
 
+function LearnerComparisonTable({ title, rows }) {
+  return (
+    <div className="learnerComparisonScroll" role="region" aria-label={title} tabIndex={0}>
+      <table className="learnerComparisonTable">
+        <caption>{title}</caption>
+        <thead>
+          <tr><th scope="col">Measure</th>{PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, ...values]) => (
+            <tr key={label}>
+              <th scope="row">{label}</th>
+              {values.map((value, index) => <td key={PERIODS[index]}>{value}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LearnerPeriodSummary({ periodResults }) {
+  const entries = PERIODS.map(period => periodResults.find(entry => entry.period === period) || {});
+  const compared = entries.map(({ result, detail, loading }) => {
+    if (!result?.is_completed) return { result };
+    const saved = { ...result, ...detail };
+    return { result, saved, passage: hasRecordedPassageAssessment(saved), miscues: countLearnerMiscues(saved), loading };
+  });
+  const score = (value, maximum) => value == null ? "Not recorded" : `${value}/${maximum}`;
+  const measure = value => value ?? "Not recorded";
+  const passageMeasure = read => ({ passage, saved }) => passage ? read(saved) : "Not administered";
+  const metrics = [
+    ["Letter sounds", ({ saved }) => score(saved.task1_score, 10)],
+    ["Word reading", ({ saved }) => (
+      Number(saved.task1_score) > 0 || (saved.word_results ?? saved.task2_results)?.length
+        ? score(saved.task2_score, 10) : "Not administered"
+    )],
+    ["Comprehension", passageMeasure(saved => score(saved.comprehension_score, 6))],
+    ["Passage", passageMeasure(saved => measure(saved.story_title))],
+    ["Correct words read", passageMeasure(saved => measure(saved.words_read))],
+    ["Reading accuracy", passageMeasure(saved => saved.miscue_accuracy == null ? "Not recorded" : `${Number(saved.miscue_accuracy).toFixed(1)}%`)],
+    ["Correct words per minute", passageMeasure(saved => (
+      saved.words_read != null && Number(saved.timer_seconds) > 0
+        ? ((Number(saved.words_read) / Number(saved.timer_seconds)) * 60).toFixed(2)
+        : "Not recorded"
+    ))],
+    ["Reading time", passageMeasure(saved => `${saved.timer_seconds} sec`)],
+    ["Total scored miscues", passageMeasure(saved => measure(saved.total_miscues))],
+  ];
+  const detailKeys = new Map(Object.keys(ANALYTICS_MISCUE_PALETTE).map(label => [label.toLowerCase().replace(/[^a-z]/g, ""), label]));
+  const hasOtherMiscues = compared.some(({ miscues }) => miscues && [...miscues.keys()].some(key => !detailKeys.has(key)));
+  const miscueRows = [...detailKeys].map(([key, label]) => [label, counts => counts.get(key) || 0]);
+  if (hasOtherMiscues) {
+    miscueRows.push(["Other miscues", counts =>
+      [...counts].reduce((sum, [key, count]) => sum + (detailKeys.has(key) ? 0 : count), 0)]);
+  }
+  const hasPassage = compared.some(entry => entry.passage);
+  return (
+    <div className="learnerPeriodSummary">
+      <LearnerComparisonTable title="Reading performance by period" rows={[
+        ["Assessment status", ...compared.map(({ result }) => learnerPeriodStatus(result))],
+        ["Reading profile", ...compared.map(({ result }) => learnerPeriodProfile(result) || "—")],
+        ...metrics.map(([label, read]) => [label, ...compared.map(entry => entry.saved ? read(entry) : "—")]),
+      ]} />
+      {hasPassage && <LearnerComparisonTable title="Miscues by type" rows={miscueRows.map(([label, read]) => [
+        label,
+        ...compared.map(({ saved, passage, miscues, loading }) => {
+          if (!saved) return "—";
+          if (!passage) return "Not administered";
+          if (loading) return "Loading…";
+          return miscues ? read(miscues) : "Details unavailable";
+        }),
+      ])} />}
+    </div>
+  );
+}
+
 export function AnalyticsLearnerResultPanel({
-  className = "",
   selectedLearner,
-  selectedPeriods,
+  periodResults,
   period,
   onPeriodChange,
-  loading,
-  error,
-  selectedAssessment,
-  detail,
+  initialSummary = false,
+  loading: loadingLearner,
+  error: learnerError,
   section,
   year,
   teacher,
   onPrintError,
 }) {
+  const [summary, setSummary] = useState(initialSummary);
+  const selected = periodResults.find(entry => entry.period === period);
+  const result = selected?.result;
+  const selectedAssessment = result?.is_completed ? result : null;
+  const detail = selected?.detail;
+  const loading = loadingLearner || selected?.loading;
+  const error = learnerError || selected?.error;
   const printContext = {learner:selectedLearner,assessment:selectedAssessment,detail,section,year,teacher,period,loading,error};
   const [exportingIndividual,setExportingIndividual]=useState(false),individualExportGeneration=useRef(0);
   useEffect(()=>{individualExportGeneration.current++;setExportingIndividual(false);return()=>{individualExportGeneration.current++;};},[selectedLearner?.id,selectedAssessment?.id,period,section?.id,year?.id,teacher?.id]);
@@ -516,23 +599,26 @@ export function AnalyticsLearnerResultPanel({
     } catch (error) { onPrintError?.(error.message || 'Unable to print this result.'); }
   };
   return (
-    <div className={`analyticsLearnerResult ${className}`.trim()}>
-      <div className="analyticsResultHeader">
+    <div className="analyticsLearnerResult">
+      <div className="analyticsResultHeader learnerResultHeader">
         <div>
-          <span>Selected learner</span>
-          <strong>{selectedLearner ? formatName(selectedLearner) : "Select a learner"}</strong>
-          {selectedLearner ? <small>{selectedLearner.lrn || "No LRN"}</small> : null}
+          <span>Learner</span>
+          <strong>{selectedLearner ? formatName(selectedLearner) : "Learner results"}</strong>
+          {selectedLearner && (
+            <small>{[selectedLearner.lrn && `LRN ${selectedLearner.lrn}`, selectedLearner.sex, section?.name, year?.label].filter(Boolean).join(" · ")}</small>
+          )}
         </div>
-        <div className="analyticsPeriodSwitch" role="group" aria-label="Assessment period">
-          {PERIODS.map((assessmentPeriod) => {
-            const available = selectedPeriods.includes(assessmentPeriod);
+        <div className="analyticsPeriodSwitch" role="group" aria-label="Learner result view">
+          <button type="button" className={summary ? "active" : ""} aria-pressed={summary} onClick={() => setSummary(true)}>Summary</button>
+          {PERIODS.map(assessmentPeriod => {
+            const active = !summary && period === assessmentPeriod;
             return (
               <button
                 type="button"
                 key={assessmentPeriod}
-                disabled={!available}
-                className={period === assessmentPeriod ? "active" : ""}
-                onClick={() => onPeriodChange(assessmentPeriod)}
+                className={active ? "active" : ""}
+                aria-pressed={active}
+                onClick={() => { setSummary(false); onPeriodChange(assessmentPeriod); }}
               >
                 {assessmentPeriod}
               </button>
@@ -541,20 +627,37 @@ export function AnalyticsLearnerResultPanel({
         </div>
       </div>
 
-      <div className="analyticsIndividualPrint">
+      {!summary && selectedAssessment && <div className="analyticsIndividualPrint">
         <button type="button" className="toolbarButton individualPrintButton" disabled={!printReady} onClick={printIndividualResult}>Print individual summary</button>
         <button type="button" className="toolbarButton individualExportButton" disabled={!printReady||exportingIndividual} onClick={exportIndividualResult}>{exportingIndividual?'Please wait…':'Export individual summary'}</button>
         <small>{printReady ? `Print the selected ${period} result with a teacher signature area. ${CLEAN_PRINT_HINT}` : 'A complete saved result is required to print.'}</small>
-      </div>
+      </div>}
       <div className="analyticsResultBody">
-        {loading ? (
+        {loadingLearner ? (
           <WorkspaceLoading label="Loading learner result…" variant="result"/>
-        ) : error ? (
-          <div className="analyticsDetailState error">{error}</div>
-        ) : !selectedAssessment ? (
-          <div className="analyticsDetailState">{selectedLearner?"This learner has no completed assessment yet.":"Select a learner result."}</div>
+        ) : learnerError ? (
+          <div className="analyticsDetailState error" role="alert">{learnerError}</div>
+        ) : !selectedLearner ? (
+          <div className="analyticsDetailState">Select a learner result.</div>
+        ) : summary ? (
+          <LearnerPeriodSummary periodResults={periodResults} />
         ) : (
-          <LearnerAssessmentEvidence detail={detail || selectedAssessment} />
+          <>
+            <div className="learnerPeriodHeading">
+              <h3>{PERIOD_MEANINGS[period]}</h3>
+              <span>{learnerPeriodStatus(result)}</span>
+              {selectedAssessment && <strong>{learnerPeriodProfile(result)}</strong>}
+            </div>
+            {loading ? (
+              <WorkspaceLoading label="Loading learner result…" variant="result"/>
+            ) : error ? (
+              <div className="analyticsDetailState error" role="alert">{error}</div>
+            ) : !selectedAssessment ? (
+              <div className="analyticsDetailState">No completed assessment for this period.</div>
+            ) : (
+              <LearnerAssessmentEvidence detail={{ ...selectedAssessment, ...detail }} />
+            )}
+          </>
         )}
       </div>
     </div>

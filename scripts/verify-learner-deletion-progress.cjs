@@ -26,7 +26,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  assert.equal(await ctx.retry(many,'section-A'),true);assert.equal(calls.length,33);assert.deepEqual(progress.slice(0,-1).map(p=>p.completed),Array.from({length:34},(_,i)=>i));assert.equal(progress.at(-1).active,false);assert.ok(progress.every(p=>p.sectionId==='section-A'));
  assert.ok(source.indexOf('{deletingProgress && (')>source.lastIndexOf('</main>'),'Progress survives main menu/tab presentation');
  assert.doesNotMatch(source,/className="content" inert/);assert.match(source,/inert=\{deletingProgress\?\.active && deletingProgress.sectionId === selectedSectionId/);assert.match(source,/Retry failed/);
- const dialog=fs.readFileSync('components/DeleteLearnersDialog.jsx','utf8');assert.ok(!dialog.includes('reason.trim().length<5'));assert.match(dialog,/'Confirm'/);assert.match(dialog,/unlockDeletionKey\(password,user\)/);
+ const dialog=fs.readFileSync('components/ArchiveLearnersDialog.jsx','utf8');assert.ok(!dialog.includes('reason.trim().length<5'));assert.match(dialog,/Confirm archive/);assert.match(dialog,/unlockDeletionKey\(password, user\)/);assert.match(dialog,/Other \(specify\)/);
  assert.match(fs.readFileSync('app/learner/LearnerAssessmentPage.jsx','utf8'),/Comic Sans MS/);assert.doesNotMatch(fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx','utf8'),/Comic Sans MS/);
  for(const file of ['public/sw.js','public/learner-pwa-sw.js']) for(const weight of ['Regular','Bold']) assert.ok(fs.readFileSync(file,'utf8').includes(`/fonts/ComicNeue-${weight}.ttf`));
  for(const weight of ['Regular','Bold']) assert.equal(fs.readFileSync(`public/fonts/ComicNeue-${weight}.ttf`).readUInt32BE(0),0x00010000);

@@ -93,7 +93,7 @@ const vm = require("node:vm");
     blankLearnerRow: id => ({ id }),
   });
   const addBegin = page.indexOf("  const addLearners =");
-  const addEnd = page.indexOf("  const deleteLearner =", addBegin);
+  const addEnd = page.indexOf("  const toggleLearnerSelection", addBegin);
   vm.runInContext(page.slice(addBegin, addEnd) + "\nglobalThis.add = addLearners;", addContext);
   for (const field of ["lrn", "lastName", "firstName"]) {
     addContext.learnerRows = [{ ...valid, [field]: "" }];
@@ -115,32 +115,30 @@ const vm = require("node:vm");
   assert.equal(calls[0].body.last_name, "LEARNER");
   console.log("PASS Start opens an unchosen period confirmation overlay; invalid names/LRN prevent writes and valid learner creation remains active");
 
-  const deleteBegin = page.indexOf("  const deleteLearner =");
-  const deleteEnd = page.indexOf("  const toggleLearnerSelection", deleteBegin);
   for (const learnerId of [406, -406]) {
     let context;
     let deletes = 0;
     context = vm.createContext({
-      selectedSectionId:"synthetic-section", withLearnerDeletionRetry: fn=>fn(), processLearnerDeletions: undefined, deleteTarget: { id: learnerId, lrn: valid.lrn }, deletingProgress: null, deletingRef: {current:false}, savingScoresheet: false,
+      selectedSectionId:"synthetic-section", withLearnerDeletionRetry: fn=>fn(), deletingProgress: null, deletingRef: {current:false}, savingScoresheet: false,
       learners: [{ id: learnerId, lrn: valid.lrn }, { id: 407, lrn: "987654321012" }],
       assessments: [{ id: 42, learner_id: learnerId }, { id: 43, learner_id: 407 }],
       scoresheetDrafts: { 42: { remarks: "Deleted learner draft" }, 43: { remarks: "Keep this draft" } },
       process: { env: { NODE_ENV: "production" } },
-      api: async () => { deletes++; return { status: "ok", deleted_learner_id: learnerId, deleted_lrn: valid.lrn }; },
+      api: async () => { deletes++; return { status: "ok", deleted_learner_ids: [learnerId] }; },
       setSelectedLearnerIds(){}, setDeletingProgress: value => { context.deletingProgress = typeof value === "function" ? value(context.deletingProgress) : value; },
       setScoresheetDrafts: update => { context.scoresheetDrafts = update(context.scoresheetDrafts); },
       setLearners: update => { context.learners = update(context.learners); },
       setAssessments: update => { context.assessments = update(context.assessments); },
-      setDeleteTarget() {}, showToast() {}, window: { setTimeout: callback => callback() },
+      showToast() {}, window: { setTimeout: callback => callback() },
     });
-    vm.runInContext(page.slice(deleteBegin, deleteEnd) + page.slice(page.indexOf("  const processLearnerDeletions ="),page.indexOf("  const requestActivityNavigation")) + "\nglobalThis.remove = deleteLearner;", context);
+    vm.runInContext(page.slice(page.indexOf("  const processLearnerDeletions ="),page.indexOf("  const requestActivityNavigation")) + `\nglobalThis.remove = () => processLearnerDeletions([{id: ${learnerId}, action: "delete_learners", body: {}}], selectedSectionId);`, context);
     await Promise.all([context.remove(), context.remove()]);
     assert.equal(deletes, 1, "Delete requests must not be duplicated while saving");
     assert.deepEqual(Array.from(context.learners, item => item.id), [407]);
     assert.deepEqual(Array.from(context.assessments, item => item.id), [43]);
     assert.deepEqual(Object.keys(context.scoresheetDrafts), ["43"]);
   }
-  assert.match(page, /<DeleteLearnersDialog/);
+  assert.match(page, /<ArchiveLearnersDialog/);
   assert.doesNotMatch(page, /scoresheetDeleteLearner"/);
   const blockedSaveContext = vm.createContext({ useCallback: callback => callback, api() { throw new Error("A delete in progress must not race a scoresheet write"); },
     finishPendingScoresheetNavigation() {}, scoresheetDrafts: { 42: { remarks: "pending" } }, savingScoresheet: false, selectedSectionId:"synthetic-section", deletingProgress: { total: 1,active:true,sectionId:"synthetic-section" }, showToast() {} });
@@ -148,7 +146,7 @@ const vm = require("node:vm");
   const saveEnd = page.indexOf("  /*", page.indexOf("  }, [", saveBegin));
   vm.runInContext(page.slice(saveBegin, saveEnd) + "\nglobalThis.save = saveScoresheetChanges;", blockedSaveContext);
   assert.equal(await blockedSaveContext.save(), false);
-  console.log("PASS scoresheet deletion uses the learner identity, cleans associated drafts, retains unrelated rows and works for offline local IDs");
+  console.log("PASS roster archiving uses the learner identity, cleans associated drafts, retains unrelated rows and works for offline local IDs");
 
   const overviewRows = [
     { learner: { id: 10, created_at: "2026-10-01T09:00:00Z" } },

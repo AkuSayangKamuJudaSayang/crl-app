@@ -1,9 +1,25 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 22 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 28 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Learner period results and roster archiving — CRL-2026-11-28.1
+
+The Conduct Assessment roster supersedes the mobile learner cards and
+per-learner Delete action. Keep one pinned identity column and three period
+columns. The Summary uses the latest completed result per period for the
+selected enrollment. Unavailable detail and unadministered tasks display
+separately from scored zeroes. Period tabs keep their item evidence and
+individual print and export. Fetch detail only for the learner in the overlay.
+
+Archive selected uses the existing password-confirmed, signed roster mutation.
+It preserves each enrollment and its evidence in an encrypted archive before
+removing the active row. Reuse the existing 30-day retention, offline replay
+and partial-failure retry path. The preset or custom reason is carried in the
+signed operation and audit detail. No assessment scoring, database schema or
+transfer policy changed. Deployment target is Railway production from GitHub main.
 
 ## Offline assessment sync on reconnect — CRL-2026-11-22.1
 
