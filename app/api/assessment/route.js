@@ -1,3 +1,4 @@
+import { applyLearnerRecommendationChanges, readLearnerRecommendations, validateLearnerRecommendationChanges } from "../../../lib/learnerRecommendations.mjs";
 import { offlineAssessmentEvidence, matchesCompletedAssessment } from "../../../lib/offlineAssessmentEvidence.mjs";
 import {getAuthenticatedUser as getCurrentTeacher} from '../../../lib/auth';
 import {withSchoolScope} from '../../../lib/prisma';
@@ -2032,9 +2033,10 @@ async function assessmentRead(
         status: "ok",
         roster_version: owner?.learnerDataVersion ?? 0,
         learners:
-          learners.map(
-            serializeLearner
-          ),
+          learners.map(learner => ({
+            ...serializeLearner(learner),
+            period_recommendations: readLearnerRecommendations(learner.periodRecommendations),
+          })),
       });
     }
 
@@ -3260,6 +3262,26 @@ async function assessmentWrite(
   } = auth;
 
   try {
+    if (action === "save_learner_recommendations") {
+      const learnerId = Number(body.learner_id);
+      if (!Number.isSafeInteger(learnerId) || learnerId <= 0) {
+        return responseJson({ error: "Choose a valid learner." }, 400);
+      }
+      const changes = validateLearnerRecommendationChanges(body.recommendations);
+      const recommendations = await prisma.$transaction(async tx => {
+        await assertRosterVersion(tx, userId, body.roster_version);
+        const section = await lockClass(tx, userId, body.class_section_id);
+        const learner = await tx.learner.findFirst({
+          where: { id: learnerId, teacherId: userId, classSectionId: section.id },
+          select: { periodRecommendations: true },
+        });
+        if (!learner) throw Object.assign(new Error("This learner is unavailable in the selected class."), { status: 404 });
+        const value = applyLearnerRecommendationChanges(learner.periodRecommendations, changes);
+        await tx.learner.update({ where: { id: learnerId }, data: { periodRecommendations: value }, select: { id: true } });
+        return value;
+      });
+      return responseJson({ status: "ok", learner_id: learnerId, period_recommendations: recommendations });
+    }
     if (action === "reconcile_offline_assessment") return await reconcileOfflineAssessment(userId, body);
     if(action === "reconcile_legacy_enrollment"){
       const section=await requireClass(prisma,userId,body.class_section_id,true);

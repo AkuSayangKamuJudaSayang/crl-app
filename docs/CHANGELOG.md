@@ -1,5 +1,31 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-28.3 — Full-width roster and period recommendations
+
+Date: 28 November 2026, Asia/Manila.
+
+Conduct Assessment fills the roster toolbar width. The pinned learner column
+uses the extra space for identity, wider checkbox spacing, and side-by-side
+View and Start actions. BoSY, MoSY and EoSY retain matching widths and scroll
+on smaller screens. The Summary keeps its miscue count comparison and removes
+the View buttons and word comparison dialog introduced in 28.2.
+
+The Recommendations column opens an editor for preset or custom text saved
+independently for BoSY, MoSY and EoSY. Recommendations attach to the learner's
+enrollment and can be entered before or after an assessment. Only edited periods
+are written. Remarks and the assessment record remain separate. Offline saves
+use the ordered outbox and accept the server's scoped acknowledgement.
+
+Updated the teacher workspace, shared result styles, recommendation editor,
+teacher API, Prisma schema, offline queue, archive handling, PWA cache v131,
+and regression checks. Clean npm install, full assessment regressions,
+optimized production build, and dependency audit with zero findings passed.
+Chromium with synthetic records verified the 320, 390, 800 and 1440 px layouts,
+preset/custom saves by period, and an offline IndexedDB save replayed online.
+Server regressions exercised enrollment ownership, edit isolation, and retry.
+Applied and verified Supabase migration `20261128111806` before application
+deployment. Retain the new column on rollback to preserve saved guidance.
+
 ## CRL-2026-11-28.2 — Roster spacing, miscue comparison and refresh stability
 
 Date: 28 November 2026, Asia/Manila.

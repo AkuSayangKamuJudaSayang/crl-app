@@ -168,6 +168,7 @@ const {
     }
   };
   const context = vm.createContext({
+    ...await import("../lib/learnerRecommendations.mjs"),
     ...shared,
     ...await import('../lib/archiveRetention.mjs'),
     requireDeletionPassword: async(db,id,password)=>{if(password!=="synthetic-password")throw shared.workspaceError("Incorrect account password.",403);},

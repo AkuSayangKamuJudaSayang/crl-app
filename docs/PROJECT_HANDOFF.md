@@ -5,6 +5,24 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Period recommendations and full-width roster — CRL-2026-11-28.3
+
+The Conduct Assessment roster uses the available horizontal space, preserves
+equal period widths and pins the learner identity. The Summary's Miscues by
+Type remains a count table. The nested word comparison from 28.2 is superseded.
+
+Recommendations are teacher-entered guidance stored on the owning enrollment
+by period. Presets supply editable text, and entering guidance requires no
+completed assessment. The school and class checks apply even when replaying an
+offline save. Keep recommendations separate from CRLA scores and remarks.
+An explicit learner or class archive retains the saved data. A reused section's
+new-year roster starts with blank recommendations. The capstone can describe
+teacher-selected and manually written guidance as distinct from automated
+classification.
+
+Deploy the additive Supabase learner recommendations migration before the
+application release. The application can be rolled back with the column present.
+
 ## Miscue word comparison and stable teacher refresh — CRL-2026-11-28.2
 
 The learner Summary compares recorded passage miscues by normalized word

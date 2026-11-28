@@ -40,6 +40,8 @@ import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
 import { printReadingProfileAnalytics } from "../../lib/printAnalytics";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
+import LearnerRecommendationsDialog from "../../components/LearnerRecommendationsDialog";
+import { readLearnerRecommendations } from "../../lib/learnerRecommendations.mjs";
 import ArchiveLearnersDialog from "../../components/ArchiveLearnersDialog";
 import { latestLearnerPeriodResults, learnerPeriodProfile, learnerPeriodStatus } from "../../lib/learnerPeriodResults.mjs";
 import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
@@ -591,7 +593,7 @@ function Icon({
 const SCOPED_TEACHER_MUTATIONS = new Set([
   "add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year",
   "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section",
-  "archive_class", "import_class_archive", "restore_learner_archives", "restore_class_archive", "purge_class_archives",
+  "archive_class", "save_learner_recommendations", "import_class_archive", "restore_learner_archives", "restore_class_archive", "purge_class_archives",
 ]);
 
 async function requestTeacherAssessment(action, { method = "GET", body, query } = {}) {
@@ -1103,6 +1105,7 @@ export default function TeacherPage() {
   const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
   const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
   const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
+  const [recommendationTarget, setRecommendationTarget] = useState(null);
   const [analyticsDetailsById, setAnalyticsDetailsById] = useState({});
 
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
@@ -1322,8 +1325,9 @@ export default function TeacherPage() {
           dashboardRefreshStateRef.current.rerun = true;
           return;
         }
+        const readStartedAt = Date.now();
         dashboardRefreshStateRef.current.inFlight = true;
-        dashboardRefreshStateRef.current.lastStart = Date.now();
+        dashboardRefreshStateRef.current.lastStart = readStartedAt;
         if (!silent) {
           setLoadingData(
             true
@@ -1401,7 +1405,18 @@ export default function TeacherPage() {
                   "",
               })
             );
-          setLearners(current => keepUnchangedRoster(current, nextLearners));
+          setLearners(current => {
+            const newerRecommendations = new Map(current.filter(row => row.recommendations_acknowledged_at >= readStartedAt)
+              .map(row => [Number(row.id), row]));
+            return keepUnchangedRoster(current, nextLearners.map(row => {
+              const newer = newerRecommendations.get(Number(row.id));
+              return newer ? {
+                ...row,
+                period_recommendations: newer.period_recommendations,
+                recommendations_acknowledged_at: newer.recommendations_acknowledged_at,
+              } : row;
+            }));
+          });
           const nextAssessments = assessmentPayload.filter(Boolean);
           setAssessments(current => keepUnchangedRoster(current, nextAssessments));
 
@@ -2740,6 +2755,32 @@ export default function TeacherPage() {
     if (!Array.isArray(jobs) || jobs.length !== ids.length || jobs.some(job => !ids.includes(job.id))) return false;
     setBulkDeleteConfirm(false);
     return processLearnerDeletions(jobs.map(job => ({...job, action:"delete_learners", name:formatName(learners.find(row=>Number(row.id)===job.id) || {})})), selectedSectionId);
+  };
+
+  const saveLearnerRecommendations = async changes => {
+    const sectionId = recommendationTarget.sectionId;
+    const learner = allLearners.find(row => (row.class_section_id ?? row.classSectionId) === sectionId &&
+      [Number(row.id), Number(row.local_id)].includes(Number(recommendationTarget.id)));
+    if (!learner) throw new Error("This learner is unavailable in the selected class.");
+    const receipt = await api("save_learner_recommendations", {
+      method: "POST",
+      body: { learner_id: learner.id, class_section_id: sectionId, recommendations: changes },
+    });
+    const receiptId = Number(receipt.learner_id);
+    const validReceipt = receiptId === Number(learner.id) || (learner.id < 0 && receipt.offline && receiptId > 0);
+    if (!receipt.period_recommendations || !validReceipt) {
+      throw new Error("The recommendation save could not be confirmed.");
+    }
+    setLearners(current => current.map(row => {
+      const sameEnrollment = (row.class_section_id ?? row.classSectionId) === sectionId &&
+        [Number(row.id), Number(row.local_id)].some(id => [Number(learner.id), Number(receipt.learner_id)].includes(id));
+      return sameEnrollment ? {
+        ...row,
+        period_recommendations: receipt.period_recommendations,
+        recommendations_acknowledged_at: Date.now(),
+      } : row;
+    }));
+    showToast(receipt.offline ? "Recommendations saved on this device. Sync pending." : "Recommendations saved.");
   };
 
   const processLearnerDeletions = async (jobs, sectionId) => {
@@ -12279,12 +12320,19 @@ export default function TeacherPage() {
         .conductRosterHeader .learnerRefreshButton{width:44px;height:44px;min-height:44px}
         .conductRosterHeading{text-align:center;overflow-wrap:anywhere}
         .conductClassContext{font-size:16px;gap:3px;margin-bottom:5px;line-height:1.35}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
-        .learnerRoster { overflow-x:auto; overscroll-behavior-inline:contain; isolation:isolate; margin:16px; }
+        .learnerRoster {
+          --roster-identity-min:345px;
+          --roster-period-width:clamp(112px,calc((100vw - 320px) / 3),225px);
+          --roster-recommendation-width:clamp(168px,19vw,300px);
+          overflow-x:auto;
+          scroll-padding-inline-start:var(--roster-identity-min);
+          overscroll-behavior-inline:contain;
+          isolation:isolate;
+          margin:16px;
+        }
         html[data-crl-theme] .learnerRoster table {
           width:100%!important;
-          max-width:960px;
-          min-width:505px!important;
-          margin-inline:auto;
+          min-width:calc(var(--roster-identity-min) + 3 * var(--roster-period-width) + var(--roster-recommendation-width))!important;
           table-layout:fixed;
           border-collapse:separate!important;
           border-spacing:0;
@@ -12292,22 +12340,45 @@ export default function TeacherPage() {
         html[data-crl-theme] .learnerRoster :is(th,td) {
           padding:10px 12px!important;
           white-space:normal;
+          overflow-wrap:anywhere;
           vertical-align:middle;
         }
         html[data-crl-theme] .learnerRoster thead th { text-align:center; background:var(--crl-surface-2)!important; }
         html[data-crl-theme] .learnerRoster .rosterIdentity {
-          position:sticky; left:0; z-index:1; width:285px;
+          position:sticky; left:0; z-index:1;
           background:var(--crl-surface)!important; box-shadow:1px 0 var(--crl-line);
         }
         html[data-crl-theme] .learnerRoster thead .rosterIdentity { background:var(--crl-surface-2)!important; }
-        .rosterLearner { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; text-align:left; }
-        .rosterLearner input { margin:0; }
-        .rosterLearnerDetails { min-width:0; display:grid; gap:4px; text-transform:none; letter-spacing:normal; overflow-wrap:anywhere; }
-        .rosterLearnerDetails strong { line-height:1.35; }
+        .learnerRoster col.rosterPeriodColumn { width:var(--roster-period-width); }
+        .learnerRoster col.rosterRecommendationColumn { width:var(--roster-recommendation-width); }
+        .rosterLearner { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:15px; text-align:left; }
+        .rosterLearner input { margin:0 0 0 -4px; }
+        .rosterLearnerDetails { min-width:0; display:grid; gap:8px; text-transform:none; letter-spacing:normal; overflow-wrap:anywhere; }
+        .rosterLearnerDetails strong { line-height:1.45; }
         .rosterLearnerDetails small,.rosterPeriodStatus { color:var(--crl-muted); font-size:13px; font-weight:500; }
         .rosterPeriodContent { display:grid; justify-items:center; gap:5px; text-align:center; overflow-wrap:anywhere; }
         .rosterPeriodContent .badge { max-width:100%; white-space:normal; line-height:1.35; }
-        .rosterLearner .inlineActions { display:grid; gap:5px; margin:0; }
+        .rosterLearner .inlineActions { display:grid; grid-template-columns:repeat(2,minmax(0,auto)); gap:6px; margin:0; }
+        .rosterRecommendations { display:grid; justify-items:center; gap:6px; text-align:center; min-width:0; }
+        .rosterRecommendationPreview { margin:0; width:100%; font-size:12px; color:var(--crl-muted); overflow:hidden; }
+        .rosterRecommendationPreview > div { display:flex; align-items:baseline; justify-content:center; gap:6px; min-width:0; }
+        .rosterRecommendationPreview dt { color:var(--crl-text); font-weight:700; }
+        .rosterRecommendationPreview dd { margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        html[data-crl-theme] .learnerRoster .rosterRecommendationButton {
+          min-height:44px;
+          min-width:0;
+          margin:0;
+          max-width:100%;
+          padding:7px 9px!important;
+          border:1px solid var(--crl-line-strong)!important;
+          border-radius:9px!important;
+          background:var(--crl-surface-2)!important;
+          color:var(--crl-text)!important;
+          font:700 13px/1.25 Arial,Helvetica,sans-serif!important;
+          white-space:normal;
+        }
+        html[data-crl-theme] .learnerRoster .rosterRecommendationButton:hover:enabled { border-color:var(--crl-active-bg,#3978b5)!important; }
+        .rosterRecommendationButton:focus-visible { outline:2px solid #568cd1; outline-offset:2px; }
         .learnerRoster:focus-visible { outline:2px solid var(--crl-active-bg,#3978b5); outline-offset:3px; }
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:60px;padding:7px 10px!important;font:700 13px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.primary{background:#287c55!important;border-color:#287c55!important;color:#fff!important}
@@ -12316,17 +12387,22 @@ export default function TeacherPage() {
         @media (hover:hover) and (pointer:fine) {
           html[data-crl-theme] .learnerRoster .inlineActions .smallButton:not(:disabled):hover { filter:brightness(.92); }
         }
-        @media(max-width:640px){
-          .learnerRoster { margin:10px; }
-          html[data-crl-theme] .learnerRoster .rosterIdentity { width:clamp(156px,48vw,235px); }
+        @media(max-width:720px){
+          .learnerRoster {
+            --roster-identity-min:clamp(156px,48vw,235px);
+            --roster-recommendation-width:clamp(104px,calc(100vw - var(--roster-identity-min) - 54px),168px);
+          }
           html[data-crl-theme] .learnerRoster :is(th,td) { padding:8px!important; }
-          .rosterLearner { grid-template-columns:minmax(0,1fr) auto; gap:4px 6px; font-size:12px; }
-          .rosterLearner input { grid-column:1; }
-          .rosterLearnerDetails { grid-column:1; gap:2px; }
+          .rosterLearner { grid-template-columns:auto minmax(0,1fr); gap:8px; font-size:12px; }
+          .rosterLearnerDetails { gap:5px; }
           .rosterLearnerDetails small,.rosterPeriodStatus { font-size:11px; }
-          .rosterLearner .inlineActions { grid-area:1 / 2 / span 2; }
+          html[data-crl-theme] .learnerRoster thead th:last-child { font-size:10px!important; letter-spacing:0!important; }
+          html[data-crl-theme] .learnerRoster .rosterRecommendationButton { font-size:12px!important; }
+          .rosterRecommendationButton .rosterRecommendationLabel { display:none; }
+          .rosterLearner .inlineActions { grid-column:1 / -1; justify-content:start; }
           html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:44px; padding:6px!important; font-size:12px!important; }
         }
+        @media(max-width:760px){ .learnerRoster { margin:10px 12px; } }
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])){background:var(--crl-surface-2)}}
         .rosterSelectionInline{display:contents}
@@ -12762,10 +12838,16 @@ export default function TeacherPage() {
                     ) : (
                         <div className="tableWrap learnerRoster" role="region" aria-label="Enrolled learners by assessment period" tabIndex={0}>
                           <table>
+                            <colgroup>
+                              <col />
+                              {PERIODS.map(period => <col className="rosterPeriodColumn" key={period} />)}
+                              <col className="rosterRecommendationColumn" />
+                            </colgroup>
                             <thead>
                               <tr>
                                 <th scope="col" className="rosterIdentity">Learner</th>
                                 {PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}
+                                <th scope="col">Recommendations</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -12778,6 +12860,8 @@ export default function TeacherPage() {
                                 });
                                 const selected = selectedLearnerIds.includes(Number(learner.id));
                                 const results = learnerPeriodResults.get(String(learner.id));
+                                const recommendations = readLearnerRecommendations(learner.period_recommendations);
+                                const savedRecommendations = Object.entries(recommendations);
                                 return (
                                   <tr key={learner.id} className={selected ? "selectedRow" : ""}>
                                     <th scope="row" className="rosterIdentity">
@@ -12811,6 +12895,18 @@ export default function TeacherPage() {
                                         </td>
                                       );
                                     })}
+                                    <td>
+                                      <div className="rosterRecommendations">
+                                        {savedRecommendations.length > 0 && <dl className="rosterRecommendationPreview">
+                                          {savedRecommendations.map(([period, recommendation]) => (
+                                            <div key={period}><dt>{period}</dt><dd>{recommendation}</dd></div>
+                                          ))}
+                                        </dl>}
+                                        <button type="button" className="toolbarButton rosterRecommendationButton" disabled={classReadonly} aria-label={`Recommendations for ${name}`} onClick={() => setRecommendationTarget({ id: learner.id, sectionId: selectedClass.id, name, recommendations })}>
+                                          {savedRecommendations.length ? "Edit" : "Add"}<span className="rosterRecommendationLabel"> recommendations</span>
+                                        </button>
+                                      </div>
+                                    </td>
                                   </tr>
                                 );
                               })}
@@ -13427,6 +13523,14 @@ export default function TeacherPage() {
           </div>
         )}
 
+        {recommendationTarget && (
+          <LearnerRecommendationsDialog
+            name={recommendationTarget.name}
+            recommendations={recommendationTarget.recommendations}
+            onSave={saveLearnerRecommendations}
+            onClose={() => setRecommendationTarget(null)}
+          />
+        )}
         {bulkDeleteConfirm && <ArchiveLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
 
         {detailsTarget && (

@@ -106,7 +106,7 @@ const vm = require("node:vm");
     enqueueOfflineMutation: async (value, host, snapshot) => { if (host) await write(`host_session:${host.code}`,host); if (snapshot) await write(`teacher_snapshot:${value.userId}`,snapshot); const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
-  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"), await import("../lib/offlineSyncNotice.mjs"), await import("../lib/assessmentRequestTimeout.mjs"), await import("../lib/canceledAssessmentQueue.mjs"));
+  Object.assign(context, await import("../lib/learnerRecommendations.mjs"), await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"), await import("../lib/offlineSyncNotice.mjs"), await import("../lib/assessmentRequestTimeout.mjs"), await import("../lib/canceledAssessmentQueue.mjs"));
  const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function OfflineRuntime", "function OfflineRuntime");
   vm.runInContext(source, context);
@@ -578,6 +578,12 @@ const vm = require("node:vm");
     if (action === "get_classes") return Response.json({ ...cached.classes, serverNow: freshTime, schoolAssessmentTimelines: [], roster_version: 0 });
     if (action === "add_learner") return Response.json({ learner: body._offline_replay ? savedLearner : addedOnline });
     if (action === "get_learners") return Response.json({ learners: [savedLearner, addedOnline], roster_version: 0 });
+    if (action === "save_learner_recommendations") {
+      assert.equal(body._offline_replay,true);
+      assert.equal(body.learner_id,savedLearner.id);
+      savedLearner.period_recommendations={...savedLearner.period_recommendations,...body.recommendations};
+      return Response.json({status:"ok",learner_id:savedLearner.id,period_recommendations:savedLearner.period_recommendations});
+    }
     if (action === "host_start") return Response.json({ code: "NEW701", learner_id: body.learner_id, assessment_session_id: 703 });
     return cloudFetch(input, init);
   };
@@ -614,6 +620,25 @@ const vm = require("node:vm");
   assert.equal(direct.learner.id, 702);
   assert.ok((await read("teacher_snapshot:901")).learners.some(row => row.id === 702));
   console.log("PASS fresh timeline read with queued work, offline refresh failure, online enrollment and assessment start using the acknowledged learner ID");
+
+  // A locally saved recommendation survives a roster read and uses the
+  // acknowledged enrollment ID, preserving the older period independently.
+  await context.removeOfflineMutation("independent");
+  context.navigator.onLine=false;
+  const localRecommendation=await request("save_learner_recommendations", {
+    class_section_id:testClassId,learner_id:pendingLearner.id,roster_version:0,recommendations:{BoSY:"Letter practice",MoSY:"Reread the passage"},
+  });
+  assert.equal(localRecommendation.offline,true);
+  assert.equal(localRecommendation.learner_id,savedLearner.id);
+  const offlineRoster=await (await context.window.fetch("/api/assessment?action=get_learners")).json();
+  assert.equal(offlineRoster.learners.find(row=>row.id===701).period_recommendations.MoSY,"Reread the passage");
+  context.navigator.onLine=true;
+  resetProbe();
+  await sync();
+  assert.deepEqual(savedLearner.period_recommendations,{BoSY:"Letter practice",MoSY:"Reread the passage"});
+  assert.equal((await read("teacher_snapshot:901")).learners.find(row=>row.id===701).period_recommendations.BoSY,"Letter practice");
+  assert.equal((await list("outbox:")).filter(row=>row.value.kind==="save_learner_recommendations").length,0);
+  console.log("PASS offline learner recommendations persist across reads, remap enrollment IDs, replay and reconcile the saved periods");
 
   context.disposeRuntime();
   records.clear();

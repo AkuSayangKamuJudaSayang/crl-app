@@ -242,6 +242,7 @@ model Learner {
   createdAt   DateTime @default(now()) @map("created_at")
   teacherId   Int      @map("teacher_id")
   classSectionId String @map("class_section_id") @db.Uuid
+  periodRecommendations Json @default("{}") @map("period_recommendations")
 
   classSection ClassSection @relation(fields: [classSectionId, teacherId], references: [id, teacherId], onDelete: Cascade, map: "learners_class_owner_fkey")
   teacher            User                @relation(fields: [teacherId], references: [id], onDelete: Cascade)

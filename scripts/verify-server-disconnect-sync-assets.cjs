@@ -70,7 +70,7 @@ const fs = require('node:fs');
 
   for (const path of ['learners-1.svg','learners-2.svg','learners-3.svg'])
     assert(!worker.includes('/login-slides/'+path),'Do not precache missing '+path);
-  assert.match(worker,/crla-pwa-v130/);
+  assert.match(worker,/crla-pwa-v131/);
   assert.equal((worker.match(/\/login-slides\/classroom-[123]\.webp/g)||[]).length,3);
   console.log('PASS missing login SVG references removed; real WebP assets remain cached');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -884,7 +884,7 @@ requireOfflinePattern(
   "enrollment acknowledgement repairs dependent offline records and replay IDs"
 );
 requireOfflinePattern(
-  /const cloudLearners = normalizeLearners\(payload\)[\s\S]{0,650}?current\.learnerTombstones[\s\S]{0,500}?const learners = nextSnapshot\.learners[\s\S]{0,500}?return jsonResponse\(\{ \.\.\.\(payload \|\| \{\}\), learners \}\)/,
+  /const cloudLearners = normalizeLearners\(payload\)[\s\S]{0,650}?current\.learnerTombstones[\s\S]{0,500}?const learners = projectLearnerRecommendations\(nextSnapshot\.learners,[\s\S]{0,500}?return jsonResponse\(\{ \.\.\.\(payload \|\| \{\}\), learners \}\)/,
   "the visible online roster must receive the reconciled cloud and IndexedDB learner list"
 );
 if (
@@ -934,7 +934,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v130/.test(serviceWorkerSource) ||
+  !/crla-pwa-v131/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)

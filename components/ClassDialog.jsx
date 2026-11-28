@@ -10,8 +10,7 @@ export default function ClassDialog({
   busy = false,
   children,
   wide = false,
-  showClose = false,
-  nested = false
+  showClose = false
 }) {
   const ref = useRef(null),
     id = useId(),
@@ -23,11 +22,6 @@ export default function ClassDialog({
   }, [onClose, busy]);
   useEffect(() => {
     const previous = document.activeElement;
-    const parent = nested ? (
-      previous?.closest('[data-crl-class-dialog]') ||
-      [...document.querySelectorAll('[data-crl-class-dialog]')].findLast(dialog => dialog !== ref.current && !dialog.inert)
-    ) : null;
-    if (parent) parent.inert = true;
     const releaseScroll = acquirePageScrollLock();
     ref.current?.focus();
     const handle = e => {
@@ -51,7 +45,6 @@ export default function ClassDialog({
       }
     };
     const back = e => {
-      if (ref.current?.inert) return;
       e.stopImmediatePropagation();
       if (!busyRef.current) closeRef.current();
     };
@@ -62,10 +55,9 @@ export default function ClassDialog({
       el?.removeEventListener('keydown', handle);
       window.removeEventListener('crl-pwa-back', back, true);
       releaseScroll();
-      if (parent) parent.inert = false;
       previous?.focus?.({ preventScroll: true });
     };
-  }, [nested]);
+  }, []);
   if (typeof document === 'undefined') return null;
   return createPortal(<div className={styles.shade}><div className={`${styles.dialog} ${wide ? styles.wideDialog : ""}`} tabIndex={-1} ref={ref} data-crl-class-dialog="" role="dialog" aria-modal="true" aria-labelledby={id}><div className={styles.dialogHeader}><h2 id={id}>{title}</h2>{showClose && <button type="button" className={styles.dialogClose} aria-label="Close" disabled={busy} onClick={onClose}>×</button>}</div><div className={styles.dialogBody} data-dialog-scroll>{children}</div></div></div>, document.body);
 }

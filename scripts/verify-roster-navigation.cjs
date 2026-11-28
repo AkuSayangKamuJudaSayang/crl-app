@@ -6,6 +6,7 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  const start=page.indexOf('<div className="tableWrap learnerRoster"'),end=page.indexOf('</table>',start)+8;
  const periodModel=await import('../lib/learnerPeriodResults.mjs');
  const records=await import('../lib/recordViewModel.mjs');
+ const recommendationModel=await import('../lib/learnerRecommendations.mjs');
  const results=[
   {id:4,learner_id:1,assessment_period:'BoSY',is_completed:true,task1_score:2,task2_score:3},
   {id:10,learner_id:1,assessment_period:'BoSY',is_completed:false,date_administered:'2026-11-05'},
@@ -14,13 +15,13 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   {id:7,learner_id:2,assessment_period:'EoSY',is_completed:false},
  ];
  const byLearner=periodModel.latestLearnerPeriodResults(results);
- const props={...periodModel,...records,learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
+ const props={...periodModel,...records,...recommendationModel,setRecommendationTarget(){},learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
  const Roster=await compile('export default function View(){return ('+page.slice(start,end)+'</div>);}',props);
  const html=renderToStaticMarkup(React.createElement(Roster));
- assert.equal((html.match(/scope="col"/g)||[]).length,4);
+ assert.equal((html.match(/scope="col"/g)||[]).length,5);
  assert.equal((html.match(/scope="row"/g)||[]).length,2);
- assert.equal((html.match(/<td[ >]/g)||[]).length,6);
- for(const label of ['LRN:','Sex:','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
+ assert.equal((html.match(/<td[ >]/g)||[]).length,8);
+ for(const label of ['LRN:','Sex:','Recommendations','rosterRecommendationLabel','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
  assert.ok(!html.includes('Developing Reader'));
  assert.ok(!html.includes('Delete'));
  assert.match(page,/\.learnerRoster \.rosterIdentity \{\s+position:sticky; left:0;/);
@@ -40,23 +41,49 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   {period:'MoSY',result:{is_completed:true,task1_score:9,task2_score:9,timer_seconds:60,words_read:95,comprehension_score:5,miscue_accuracy:95,total_miscues:5},detail:{passage_miscues:[{miscue_type:'Omission'},{miscue_type:'Last Word Read'}]}},
   {period:'EoSY',result:{is_completed:true,task1_score:9,task2_score:9,timer_seconds:120,words_read:80,comprehension_score:4,miscue_accuracy:80,total_miscues:20}},
  ]}));
- for(const label of ['Reading Performance','Miscues by Type','1 min 0 sec','2 min 0 sec','Total miscues','95.00','40.00','Not administered','Details unavailable','View omission details'])assert.ok(summary.includes(label),label);
+ for(const label of ['Reading Performance','Miscues by Type','1 min 0 sec','2 min 0 sec','Total miscues','95.00','40.00','Not administered','Details unavailable'])assert.ok(summary.includes(label),label);
  assert.match(summary,/>Omission<\/th><td role="cell">Not administered<\/td><td role="cell">1<\/td><td role="cell">Details unavailable<\/td>/);
  assert.match(summary,/>Substitution<\/th><td role="cell">Not administered<\/td><td role="cell">0<\/td><td role="cell">Details unavailable<\/td>/);
  assert.doesNotMatch(summary,/>Measure<|Total scored miscues/);
- const words=periodModel.compareLearnerMiscueWords([
-   {period:'BoSY',saved:{story_text:'The cat sat on the mat.',passage_miscues:[{word_index:1,miscue_type:'Omission'},{word_index:5,miscue_type:'Omission'}]},passage:true},
-   {period:'MoSY',saved:{story_text:'Cat, fox and CAT!',passage_miscues:[{wordIndex:3,type:'Substitution',misreadWord:'kitten'},{wordIndex:0,type:'Last Word Read'}]},passage:true},
-   {period:'EoSY',saved:{story_text:'That cat slept.',passage_miscues:[]},passage:true},
- ],'omission',new Set(['substitution','omission']));
- const cat=words.find(row=>row.key==='cat');
- assert.equal(cat.periods[0].observations[0].type,'omission');
- assert.equal(cat.periods[1].observations[0].type,'substitution');
- assert.equal(cat.periods[1].observations[0].position,4);
- assert.equal(cat.periods[1].observations[0].misreadWord,'kitten');
- assert.deepEqual(cat.periods[1].occurrences,[1,4]);
- assert.equal(cat.periods[2].note,'No miscue recorded');
- assert.equal(words.find(row=>row.key==='mat').periods[1].note,'Word not in passage');
+ assert.doesNotMatch(summary,/<button|Word comparison/);
+ const {validateLearnerRecommendationChanges,applyLearnerRecommendationChanges,projectLearnerRecommendations}=recommendationModel;
+ assert.deepEqual(validateLearnerRecommendationChanges({BoSY:'  Practice  ',EoSY:'  '}),{BoSY:'Practice',EoSY:''});
+ assert.throws(()=>validateLearnerRecommendationChanges({bogus:'Practice'}),/valid assessment period/);
+ assert.throws(()=>validateLearnerRecommendationChanges({BoSY:'a'.repeat(1001)}),/1,000 characters/);
+ assert.deepEqual(applyLearnerRecommendationChanges({BoSY:'Original',MoSY:'Keep',EoSY:'Clear'},{BoSY:'Update',EoSY:''}),{BoSY:'Update',MoSY:'Keep'});
+ const roster=[{id:81,local_id:-81,class_section_id:'section',period_recommendations:{BoSY:'Original'}},{id:82,class_section_id:'other'}];
+ const projected=projectLearnerRecommendations(roster,[
+   {kind:'save_learner_recommendations',body:{learner_id:-81,class_section_id:'section',recommendations:{MoSY:'Local'}}},
+   {kind:'save_learner_recommendations',body:{learner_id:81,class_section_id:'section',recommendations:{EoSY:'Pending'}}},
+   {kind:'save_learner_recommendations',body:{learner_id:81,class_section_id:'other',recommendations:{BoSY:'Ignore'}}},
+ ]);
+ assert.deepEqual(projected[0].period_recommendations,{BoSY:'Original',MoSY:'Local',EoSY:'Pending'});
+ assert.equal(projected[1],roster[1]);
+ const route=fs.readFileSync('app/api/assessment/route.js','utf8');
+ const saveStart=route.indexOf('    if (action === "save_learner_recommendations")');
+ const saveEnd=route.indexOf('    if (action === "reconcile_offline_assessment")',saveStart);
+ const userId=9,sectionId='synthetic-section',learnerId=81;
+ let saved={BoSY:'First',MoSY:'Keep'};
+ let owned=true,identity;
+ const tx={learner:{
+  findFirst:async({where})=>{identity={...where};return owned?{periodRecommendations:saved}:null;},
+  update:async({data})=>{saved=data.periodRecommendations;},
+ }};
+ const scope=vm.createContext({
+  ...recommendationModel,userId,
+  prisma:{$transaction:async work=>work(tx)},
+  responseJson:(data,status=200)=>({data,status}),
+  assertRosterVersion:async(_tx,owner,version)=>{assert.equal(owner,userId);assert.equal(version,2);},
+  lockClass:async(_tx,owner,id)=>{assert.equal(owner,userId);assert.equal(id,sectionId);return{id};},
+ });
+ const save=vm.runInContext('(async (action,body)=>{'+route.slice(saveStart,saveEnd)+'})',scope);
+ const payload={learner_id:learnerId,class_section_id:sectionId,roster_version:2,recommendations:{BoSY:'New',EoSY:'End'}};
+ await save('save_learner_recommendations',payload);
+ await save('save_learner_recommendations',payload);
+ assert.deepEqual(identity,{id:learnerId,teacherId:userId,classSectionId:sectionId});
+ assert.deepEqual(saved,{BoSY:'New',MoSY:'Keep',EoSY:'End'});
+ owned=false;
+ await assert.rejects(()=>save('save_learner_recommendations',payload),/unavailable in the selected class/);
  const comparison=await import('../lib/profileComparison.mjs');
  const labels=['Reading At Grade Level'],periods=[{period:'BoSY',total:1,profiles:[{label:labels[0],count:1}]},{period:'MoSY',total:0,profiles:[]},{period:'EoSY',total:0,profiles:[]}];
  const row=comparison.profileComparisonData(periods).rows.find(r=>r.label===labels[0]);assert.equal(row.values[0].count,1);assert.equal(row.values[1].count,null);assert.equal(row.values[2].assessed,false);
