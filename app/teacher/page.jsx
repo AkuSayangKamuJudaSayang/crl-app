@@ -40,10 +40,9 @@ import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
 import { printReadingProfileAnalytics } from "../../lib/printAnalytics";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
-import LearnerRecommendationEditor from "../../components/LearnerRecommendationEditor";
-import { matchesReadingFollowUp } from "../../lib/readingFollowUp.mjs";
-import { buildReadingFollowUpReport } from "../../lib/readingFollowUpExport";
-import { readLearnerRecommendations } from "../../lib/learnerRecommendations.mjs";
+import LearnerRemarksField from "../../components/LearnerRemarksField";
+import TeacherReadingRecommendations from "../../components/TeacherReadingRecommendations";
+import { applyLearnerRecommendationChanges, readLearnerRecommendations } from "../../lib/learnerRecommendations.mjs";
 import ArchiveLearnersDialog from "../../components/ArchiveLearnersDialog";
 import { latestLearnerPeriodResults, learnerPeriodProfile, learnerPeriodStatus } from "../../lib/learnerPeriodResults.mjs";
 import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
@@ -93,6 +92,10 @@ const TABS = [
     label: "Assessment Records",
   },
   {
+    id: "recommendations",
+    label: "Recommendations and Interventions",
+  },
+  {
     id: "activities",
     label: "Assessment Contents",
   },
@@ -110,6 +113,7 @@ const TABS = [
   },
 ];
 
+const CLASS_SCOPED_TABS = ["conduct", "records", "recommendations"];
 const PERIODS = ASSESSMENT_PERIODS;
 const PERIOD_MEANINGS = {
   BoSY: "Beginning of School Year",
@@ -1107,12 +1111,9 @@ export default function TeacherPage() {
   const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
   const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
   const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
-  const [recommendationTarget, setRecommendationTarget] = useState(null);
-  const [followUpPeriod, setFollowUpPeriod] = useState("BoSY");
-  const [followUpProfile, setFollowUpProfile] = useState("");
-  const [followUpSaved, setFollowUpSaved] = useState("");
-  const [exportingFollowUp, setExportingFollowUp] = useState(false);
-  useEffect(() => { setRecommendationTarget(null); }, [selectedSectionId, activeTab]);
+  const [remarksPeriod, setRemarksPeriod] = useState(PERIODS[0]);
+  const [recommendationDrafts, setRecommendationDrafts] = useState({});
+  const recommendationSaves = useRef(new Set());
   const [analyticsDetailsById, setAnalyticsDetailsById] = useState({});
 
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
@@ -1914,9 +1915,7 @@ export default function TeacherPage() {
             return (
               matchesSearch &&
               matchesSex &&
-              matchesStatus &&
-              matchesReadingFollowUp(learner, learnerPeriodResults.get(String(learner.id))?.[followUpPeriod],
-                followUpPeriod, followUpProfile, followUpSaved)
+              matchesStatus
             );
           }
         );
@@ -1978,10 +1977,6 @@ export default function TeacherPage() {
       statusFilter,
       sortMode,
       recentlyAddedLearnerIds,
-      learnerPeriodResults,
-      followUpPeriod,
-      followUpProfile,
-      followUpSaved,
     ]);
 
   const [recordsPrintScope,setRecordsPrintScope]=useState(null);
@@ -2748,73 +2743,58 @@ export default function TeacherPage() {
     setSelectedLearnerIds([]);
   };
 
-  const saveLearnerRecommendation = async (target, text) => {
-    const sectionId = target.sectionId;
-    const learner = allLearners.find(row => (row.class_section_id ?? row.classSectionId) === sectionId &&
-      [Number(row.id), Number(row.local_id)].includes(Number(target.id)));
-    if (!learner) throw new Error("This learner is unavailable in the selected class.");
-    const receipt = await api("save_learner_recommendations", {
-      method: "POST",
-      body: { learner_id: learner.id, class_section_id: sectionId, recommendations: { [target.period]: text } },
+  const recommendationKey = (learner, period, sectionId = selectedSectionId) =>
+    JSON.stringify([sectionId, learner.local_id ?? learner.id, period]);
+  const getRecommendationDraft = (learner, period) => recommendationDrafts[recommendationKey(learner, period)];
+
+  const setRecommendationDraft = (learner, period, value) => {
+    const key = recommendationKey(learner, period);
+    setRecommendationDrafts(current => {
+      if (value !== undefined) return { ...current, [key]: value };
+      const { [key]: removed, ...rest } = current;
+      return rest;
     });
-    const receiptId = Number(receipt.learner_id);
-    const validReceipt = receiptId === Number(learner.id) || (learner.id < 0 && receipt.offline && receiptId > 0);
-    if (!receipt.period_recommendations || !validReceipt) {
-      throw new Error("The recommendation save could not be confirmed.");
-    }
-    setLearners(current => current.map(row => {
-      const sameEnrollment = (row.class_section_id ?? row.classSectionId) === sectionId &&
-        [Number(row.id), Number(row.local_id)].some(id => [Number(learner.id), Number(receipt.learner_id)].includes(id));
-      return sameEnrollment ? {
-        ...row,
-        period_recommendations: receipt.period_recommendations,
-        recommendations_acknowledged_at: Date.now(),
-      } : row;
-    }));
-    if (!matchesReadingFollowUp(
-      { period_recommendations: receipt.period_recommendations },
-      learnerPeriodResults.get(String(learner.id))?.[followUpPeriod],
-      followUpPeriod, followUpProfile, followUpSaved
-    )) setSelectedLearnerIds(current => current.filter(id => id !== Number(learner.id)));
-    showToast(receipt.offline ? "Recommendations saved on this device. Sync pending." : "Recommendations saved.");
   };
 
-  const exportReadingFollowUp = async () => {
-    if (exportingFollowUp || !filteredLearners.length || !selectedClass) return;
-    const report = {
-      learners: filteredLearners, results: learnerPeriodResults, period: followUpPeriod,
-      section: selectedClass.name, year: selectedYear?.label,
-    };
-    setExportingFollowUp(true);
+  const saveLearnerRecommendation = async (learner, period, text) => {
+    const sectionId = selectedSectionId;
+    if (classReadonly || classIdOf(learner) !== sectionId || deletingRef.current) {
+      throw new Error("This learner is unavailable for editing.");
+    }
+    const key = recommendationKey(learner, period, sectionId);
+    if (recommendationSaves.current.has(key)) throw new Error("A save is already in progress. Try again shortly.");
+    recommendationSaves.current.add(key);
+    const submittedDraft = recommendationDrafts[key];
     try {
-      const { blob, filename } = await buildReadingFollowUpReport(report);
-      downloadBlob(blob, filename);
-    } catch (error) {
-      showToast(error?.message || "Unable to export the follow-up report.", "error");
+      const receipt = await api("save_learner_recommendations", {
+        method: "POST",
+        body: { learner_id: learner.id, class_section_id: sectionId, recommendations: { [period]: text } },
+      });
+      const receiptId = Number(receipt.learner_id);
+      const validReceipt = receiptId === Number(learner.id) || (learner.id < 0 && receipt.offline && receiptId > 0);
+      if (!receipt.period_recommendations || !validReceipt) {
+        throw new Error("The recommendation save could not be confirmed.");
+      }
+      const value = readLearnerRecommendations(receipt.period_recommendations)[period] ?? "";
+      setLearners(current => current.map(row => {
+        const sameEnrollment = classIdOf(row) === sectionId &&
+          [Number(row.id), Number(row.local_id)].some(id => [Number(learner.id), receiptId].includes(id));
+        return sameEnrollment ? {
+          ...row,
+          period_recommendations: applyLearnerRecommendationChanges(row.period_recommendations, { [period]: value }),
+          recommendations_acknowledged_at: Date.now(),
+        } : row;
+      }));
+      setRecommendationDrafts(current => {
+        if (current[key] !== submittedDraft) return current;
+        const { [key]: removed, ...rest } = current;
+        return rest;
+      });
+      showToast(receipt.offline ? "Recommendation saved on this device. Sync pending." : "Recommendation saved.");
     } finally {
-      setExportingFollowUp(false);
+      recommendationSaves.current.delete(key);
     }
   };
-
-  const editRecommendationLearner = recommendationTarget && recommendationTarget.sectionId === selectedSectionId
-    ? learners.find(row => [Number(row.id), Number(row.local_id)].includes(Number(recommendationTarget.id)))
-    : null;
-  const recommendationEditorRow = editRecommendationLearner && !classReadonly ? (
-    <tr className="readingRecommendationRow" key="recommendation-editor">
-      <td colSpan={5}>
-        <LearnerRecommendationEditor
-          key={`${recommendationTarget.sectionId}:${recommendationTarget.id}:${recommendationTarget.period}`}
-          name={recommendationTarget.name}
-          period={recommendationTarget.period}
-          profile={learnerPeriodProfile(learnerPeriodResults.get(String(editRecommendationLearner.id))?.[recommendationTarget.period])}
-          value={recommendationTarget.value}
-          disabled={Boolean(deletingProgress?.active)}
-          onSave={text => saveLearnerRecommendation(recommendationTarget, text)}
-          onClose={() => setRecommendationTarget(current => current === recommendationTarget ? null : current)}
-        />
-      </td>
-    </tr>
-  ) : null;
 
   const bulkDeleteLearners = async (skipConfirm = false, confirmation = {}) => {
     const ids = selectedLearnerIds
@@ -2959,7 +2939,7 @@ export default function TeacherPage() {
 
         window.setTimeout(
           () => {
-            if (["conduct", "records"].includes(tabId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setSelectedLearnerIds([]); setChoosingClass(true); }
+            if (CLASS_SCOPED_TABS.includes(tabId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setSelectedLearnerIds([]); setChoosingClass(true); }
             if (tabId === "analytics") changeAnalyticsClass("", "");
             setActiveTab(
               tabId
@@ -2995,7 +2975,7 @@ export default function TeacherPage() {
         setReportsView("choice");
         return;
       }
-      if(!bentoOpen&&["conduct","records"].includes(tabId)){setSelectedSchoolYearId("");setSelectedSectionId("");setSelectedLearnerIds([]);setChoosingClass(true);}
+      if(!bentoOpen&&CLASS_SCOPED_TABS.includes(tabId)){setSelectedSchoolYearId("");setSelectedSectionId("");setSelectedLearnerIds([]);setChoosingClass(true);}
       if(!bentoOpen&&tabId==="analytics")changeAnalyticsClass("","");
       setBentoOpen(true);
       selectTab(tabId);
@@ -12414,56 +12394,58 @@ export default function TeacherPage() {
         .rosterPeriodContent { display:grid; justify-items:center; gap:5px; text-align:center; overflow-wrap:anywhere; }
         .rosterPeriodContent .badge { max-width:100%; white-space:normal; line-height:1.35; }
         .rosterLearner .inlineActions { display:grid; grid-template-columns:repeat(2,minmax(0,auto)); gap:6px; margin:0; }
-        .rosterRecommendations { display:grid; justify-items:center; gap:6px; text-align:center; min-width:0; }
-        .rosterRecommendationPreview { margin:0; font-size:13px; color:var(--crl-text); white-space:pre-wrap; overflow-wrap:anywhere; }
-        .readingFollowUpBar { display:flex; align-items:end; flex-wrap:wrap; gap:10px; padding:14px 16px; border-bottom:1px solid var(--crl-line); }
-        .readingFollowUpBar h3 { flex-basis:100%; margin:0; font-size:15px; color:var(--crl-text); }
-        .readingFollowUpBar label,.readingInterventionPicker label,.readingRecommendationInput { display:grid; min-width:0; gap:5px; font-size:12px; font-weight:700; color:var(--crl-text); }
-        .readingFollowUpBar label { flex:1 1 164px; }
-        .readingFollowUpBar .toolbarButton { min-height:44px; width:auto; }
-        .readingFollowUpBar .readingFollowUpExport { margin-left:auto; }
-        .learnerRoster { container-type:inline-size; }
-        html[data-crl-theme] .learnerRoster .readingRecommendationRow td { padding:0!important; }
-        .readingRecommendationEditor {
-          position:sticky;
-          inset-inline-start:0;
-          box-sizing:border-box;
-          width:min(100%, 740px);
-          width:min(100cqw, 740px);
-          display:grid;
-          gap:12px;
-          padding:16px;
-          background:var(--crl-surface-2);
-          color:var(--crl-text);
-          text-align:left;
-          border-bottom:1px solid var(--crl-line);
+        .bentoTile[data-tab="recommendations"] .bentoLabel { min-width:0; max-width:100%; overflow-wrap:anywhere; font-size:clamp(14px,1.45vw,20px); }
+        @media(min-width:1360px) {
+          .bentoBlocks { grid-template-columns:repeat(4,minmax(0,1fr)); }
+          .bentoTile { padding:18px; }
+          .bentoTile[data-tab="recommendations"] .bentoLabel { font-size:16px; }
         }
-        .readingRecommendationHeading { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; }
-        .readingRecommendationHeading span { color:var(--crl-muted); font-size:13px; }
+        .topbarTitle[data-tab="recommendations"] { overflow-wrap:anywhere; white-space:normal; }
+        .rosterRemarksHeader { display:grid; justify-items:center; gap:6px; }
+        .rosterRemarksHeader > [data-crl-select] { width:min(100%, 110px); font-size:12px; letter-spacing:normal; text-transform:none; }
+        .rosterRemarks { display:grid; gap:4px; text-align:left; }
+        .rosterRemarks small { overflow-wrap:anywhere; font-size:12px; color:var(--crl-muted); }
+        .rosterRemarks textarea,.readingRecommendationInput textarea {
+          box-sizing:border-box; width:100%; min-width:0; min-height:48px; padding:9px;
+          border:1px solid var(--crl-line-strong); border-radius:8px; color:var(--crl-text);
+          background:var(--crl-surface); font:14px/1.45 Arial,sans-serif; resize:vertical;
+        }
+        .rosterRemarks textarea:focus-visible,.readingRecommendationInput textarea:focus-visible,.readingRecommendationEditor:focus-visible { outline:2px solid #568cd1; outline-offset:-2px; }
+        .recommendationsPanel { min-width:0; }
+        .recommendationsHeader { flex-wrap:wrap; gap:8px 16px; }
+        .recommendationsHeader h2 { margin:0; font-size:clamp(20px,2.5vw,26px); color:var(--crl-text); }
+        .recommendationsHeader > span { color:var(--crl-muted); font-size:13px; }
+        .readingFollowUpBar { display:grid; grid-template-columns:minmax(104px,.6fr) minmax(180px,1fr) minmax(195px,1.15fr) auto; align-items:end; gap:10px; padding:14px 16px; border-bottom:1px solid var(--crl-line); }
+        .readingFollowUpBar label,.readingInterventionPicker label,.readingRecommendationInput { display:grid; min-width:0; gap:5px; font-size:13px; font-weight:700; color:var(--crl-text); }
+        .readingFollowUpBar .toolbarButton { min-height:44px; width:auto; margin-inline-start:auto; }
+        .recommendationsCount,.recommendationsEmpty { margin:12px 16px; font-size:14px; color:var(--crl-muted); }
+        .recommendationsList { display:grid; gap:10px; list-style:none; margin:0; padding:0 16px 16px; }
+        .recommendationCard { min-width:0; border:1px solid var(--crl-line); border-radius:12px; overflow:hidden; }
+        .recommendationCardHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; background:var(--crl-surface-2); }
+        .recommendationCardHeader > div { min-width:0; }
+        .recommendationCardHeader strong { overflow-wrap:anywhere; color:var(--crl-text); }
+        .recommendationCardHeader p,.recommendationCardNote { margin:4px 0 0; font-size:13px; color:var(--crl-muted); overflow-wrap:anywhere; }
+        .recommendationCardNote { margin:0; padding:10px 14px; color:var(--crl-text); white-space:pre-wrap; }
+        .recommendationCardHeader .toolbarButton { flex:none; width:auto; min-height:44px; }
+        .readingRecommendationEditor { box-sizing:border-box; display:grid; gap:12px; padding:16px; color:var(--crl-text); text-align:left; background:var(--crl-surface); }
         .readingRecommendationSuggestion,.readingInterventionPicker,.readingRecommendationActions { display:flex; align-items:end; flex-wrap:wrap; gap:8px; min-width:0; }
-        .readingRecommendationSuggestion { align-items:center; }
-        .readingRecommendationSuggestion p { flex:1 1 240px; margin:0; color:var(--crl-text); font-size:13px; line-height:1.45; }
+        .readingRecommendationSuggestion { align-items:center; padding:10px; border-radius:8px; background:var(--crl-surface-2); }
+        .readingRecommendationSuggestion p { flex:1 1 240px; margin:0; color:var(--crl-text); font-size:14px; line-height:1.45; }
         .readingInterventionPicker label { flex:1 1 220px; }
         .readingRecommendationActions a { margin-inline-end:auto; color:var(--crl-blue); font-size:13px; padding:6px 0; }
         .readingRecommendationEditor .toolbarButton { min-height:44px; width:auto; max-width:100%; white-space:normal; }
-        .readingRecommendationInput textarea { box-sizing:border-box; width:100%; min-width:0; padding:9px; border:1px solid var(--crl-line-strong); border-radius:8px; color:var(--crl-text); background:var(--crl-surface); font:14px/1.45 Arial,sans-serif; resize:vertical; }
-        .readingRecommendationInput textarea:focus-visible,.readingRecommendationEditor:focus-visible { outline:2px solid #568cd1; outline-offset:-2px; }
-        .readingRecommendationError { margin:0; color:var(--crl-danger,#bb4848); }
-        html[data-crl-theme] .learnerRoster .rosterRecommendationButton {
-          min-height:44px;
-          min-width:0;
-          margin:0;
-          max-width:100%;
-          padding:7px 9px!important;
-          border:1px solid var(--crl-line-strong)!important;
-          border-radius:9px!important;
-          background:var(--crl-surface-2)!important;
-          color:var(--crl-text)!important;
-          font:700 13px/1.25 Arial,Helvetica,sans-serif!important;
-          white-space:normal;
+        .readingRecommendationError,.rosterRemarks .readingRecommendationError { margin:0; color:var(--crl-danger,#bb4848); }
+        @media(max-width:780px) {
+          .readingFollowUpBar { grid-template-columns:repeat(2,minmax(0,1fr)); }
         }
-        html[data-crl-theme] .learnerRoster .rosterRecommendationButton:hover:enabled { border-color:var(--crl-active-bg,#3978b5)!important; }
-        .rosterRecommendationButton:focus-visible { outline:2px solid #568cd1; outline-offset:2px; }
+        @media(max-width:520px) {
+          .readingFollowUpBar { grid-template-columns:minmax(0,1fr); }
+          .readingFollowUpBar .toolbarButton { width:100%; }
+        }
+        @media(max-width:430px) {
+          .bentoTile[data-tab="recommendations"] .bentoLabel { font-size:clamp(12px,3.4vw,14px); }
+          .rosterRemarks textarea,.readingRecommendationInput textarea { font-size:16px; }
+        }
         .learnerRoster:focus-visible { outline:2px solid var(--crl-active-bg,#3978b5); outline-offset:3px; }
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:60px;padding:7px 10px!important;font:700 13px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton.primary{background:#287c55!important;border-color:#287c55!important;color:#fff!important}
@@ -12482,8 +12464,6 @@ export default function TeacherPage() {
           .rosterLearnerDetails { gap:5px; }
           .rosterLearnerDetails small,.rosterPeriodStatus { font-size:11px; }
           html[data-crl-theme] .learnerRoster thead th:last-child { font-size:10px!important; letter-spacing:0!important; }
-          html[data-crl-theme] .learnerRoster .rosterRecommendationButton { font-size:12px!important; }
-          .rosterRecommendationButton .rosterRecommendationLabel { display:none; }
           .rosterLearner .inlineActions { grid-column:1 / -1; justify-content:start; }
           html[data-crl-theme] .learnerRoster .inlineActions .smallButton { min-width:44px; padding:6px!important; font-size:12px!important; }
         }
@@ -12655,6 +12635,7 @@ export default function TeacherPage() {
                     key={tab.id}
                     type="button"
                     className="bentoTile"
+                    data-tab={tab.id}
                     aria-label={tab.label}
                     aria-haspopup={tab.id === "reports" ? "dialog" : undefined}
                     aria-expanded={tab.id === "reports" ? reportsView !== null : undefined}
@@ -12672,8 +12653,12 @@ export default function TeacherPage() {
                     </span>
 
                     <span className="bentoLabel">
-                      <span>{tab.label.split(" ")[0]}</span>
-                      {tab.label.includes(" ") && <span>{tab.label.split(" ").slice(1).join(" ")}</span>}
+                      {tab.id === "recommendations" ? (
+                        <><span>Recommendations</span><span>and Interventions</span></>
+                      ) : (
+                        <><span>{tab.label.split(" ")[0]}</span>
+                        {tab.label.includes(" ") && <span>{tab.label.split(" ").slice(1).join(" ")}</span>}</>
+                      )}
                     </span>
                   </button>
                 )
@@ -12699,7 +12684,7 @@ export default function TeacherPage() {
               </span>
             </button>
 
-            <div className="topbarTitle">
+            <div className="topbarTitle" data-tab={activeTab}>
               {(TABS.find(
                 (tab) =>
                   tab.id === activeTab
@@ -12735,16 +12720,16 @@ export default function TeacherPage() {
 
           <div className="content">
             <div
-              className={`contentStage ${["conduct","records","analytics","activities"].includes(activeTab)?"classPageLayout":""} ${
+              className={`contentStage ${(CLASS_SCOPED_TABS.includes(activeTab) || ["analytics","activities"].includes(activeTab))?"classPageLayout":""} ${
                 transitioning
                   ? "transitioning"
                   : ""
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {CLASS_SCOPED_TABS.includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
               </ClassScopeSidebar>}
-              {["conduct","records"].includes(activeTab)&&learnersLoaded&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
+              {CLASS_SCOPED_TABS.includes(activeTab)&&learnersLoaded&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -12904,39 +12889,9 @@ export default function TeacherPage() {
                     </div>
                     )}
 
-                    {learnersLoaded && (
-                      <section className="readingFollowUpBar" aria-label="Reading follow-up filters">
-                        <h3>Reading follow-up</h3>
-                        <label>
-                          <span>Follow-up period</span>
-                          <Select aria-label="Follow-up period" value={followUpPeriod} onChange={event => { setFollowUpPeriod(event.target.value); clearLearnerSelection(); }}>
-                            {PERIODS.map(period => <option key={period} value={period}>{period}</option>)}
-                          </Select>
-                        </label>
-                        <label>
-                          <span>Reading profile</span>
-                          <Select aria-label="Filter by reading profile" value={followUpProfile} onChange={event => { setFollowUpProfile(event.target.value); clearLearnerSelection(); }}>
-                            <option value="">All profiles</option>
-                            {READING_PROFILE_LABELS.map(profile => <option key={profile} value={profile}>{profile}</option>)}
-                            <option value="unassessed">No reading profile yet</option>
-                          </Select>
-                        </label>
-                        <label>
-                          <span>Recommendation status</span>
-                          <Select aria-label="Filter by recommendation status" value={followUpSaved} onChange={event => { setFollowUpSaved(event.target.value); clearLearnerSelection(); }}>
-                            <option value="">All recommendations</option>
-                            <option value="with">With recommendation</option>
-                            <option value="without">Without recommendation</option>
-                          </Select>
-                        </label>
-                        <button type="button" className="toolbarButton readingFollowUpExport" disabled={!filteredLearners.length || exportingFollowUp} onClick={exportReadingFollowUp}>
-                          {exportingFollowUp ? "Preparing report…" : "Export follow-up report"}
-                        </button>
-                      </section>
-                    )}
                     {!learnersLoaded ? (
                       <WorkspaceLoading label="Loading enrolled learners…" variant="roster-rows"/>
-                    ) : filteredLearners.length === 0 && !recommendationEditorRow ? (
+                    ) : filteredLearners.length === 0 ? (
                       <div className="emptyState learnerEmptyState">
                         <div className="emptyIcon">
                           +
@@ -12962,13 +12917,18 @@ export default function TeacherPage() {
                               <tr>
                                 <th scope="col" className="rosterIdentity">Learner</th>
                                 {PERIODS.map(period => <th scope="col" key={period}>{period}</th>)}
-                                <th scope="col">Recommendations <span className="rosterRecommendationPeriod">({followUpPeriod})</span></th>
+                                <th scope="col">
+                                  <div className="rosterRemarksHeader">
+                                    <span>Recommendation remarks</span>
+                                    <Select aria-label="Remarks period" value={remarksPeriod} onChange={event => setRemarksPeriod(event.target.value)}>
+                                      {PERIODS.map(period => <option key={period} value={period}>{period}</option>)}
+                                    </Select>
+                                  </div>
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {[
-                              ...(recommendationEditorRow && !filteredLearners.some(learner => learner.id === editRecommendationLearner.id) ? [recommendationEditorRow] : []),
-                              ...filteredLearners.flatMap(learner => {
+                              {filteredLearners.map(learner => {
                                 const name = formatName({
                                   ...learner,
                                   first_name: learner.first_name ?? learner.firstName,
@@ -12977,9 +12937,8 @@ export default function TeacherPage() {
                                 });
                                 const selected = selectedLearnerIds.includes(Number(learner.id));
                                 const results = learnerPeriodResults.get(String(learner.id));
-                                const recommendation = readLearnerRecommendations(learner.period_recommendations)[followUpPeriod] ?? "";
-                                const editing = Boolean(recommendationEditorRow && editRecommendationLearner.id === learner.id);
-                                const row = (
+                                const recommendation = readLearnerRecommendations(learner.period_recommendations)[remarksPeriod] ?? "";
+                                return (
                                   <tr key={learner.id} className={selected ? "selectedRow" : ""}>
                                     <th scope="row" className="rosterIdentity">
                                       <div className="rosterLearner">
@@ -13013,26 +12972,42 @@ export default function TeacherPage() {
                                       );
                                     })}
                                     <td>
-                                      <div className="rosterRecommendations">
-                                        {recommendation && <p className="rosterRecommendationPreview">{recommendation}</p>}
-                                        <button type="button" className="toolbarButton rosterRecommendationButton" disabled={classReadonly || Boolean(recommendationEditorRow)} aria-expanded={editing} aria-label={`Recommendations for ${name}`} onClick={() => setRecommendationTarget({
-                                          id: learner.id, sectionId: selectedClass.id, name, period: followUpPeriod, value: recommendation,
-                                        })}>
-                                          {editing ? "Editing" : recommendation ? "Edit" : "Add"}<span className="rosterRecommendationLabel"> recommendation</span>
-                                        </button>
-                                      </div>
+                                      <LearnerRemarksField
+                                        key={recommendationKey(learner, remarksPeriod)}
+                                        name={name}
+                                        period={remarksPeriod}
+                                        value={recommendation}
+                                        draft={getRecommendationDraft(learner, remarksPeriod)}
+                                        readOnly={classReadonly}
+                                        onChange={text => setRecommendationDraft(learner, remarksPeriod, text)}
+                                        onSave={text => saveLearnerRecommendation(learner, remarksPeriod, text)}
+                                      />
                                     </td>
                                   </tr>
                                 );
-                                return editing ? [row, recommendationEditorRow] : [row];
-                              }),
-                              ]}
+                              })}
                             </tbody>
                           </table>
                         </div>
                     )}
                   </div>
                 </>
+              )}
+
+              {activeTab === "recommendations" && selectedClass && !choosingClass && (
+                <TeacherReadingRecommendations
+                  key={selectedClass.id}
+                  learners={learners}
+                  results={learnerPeriodResults}
+                  periods={PERIODS}
+                  section={selectedClass.name}
+                  year={selectedYear?.label}
+                  readOnly={classReadonly}
+                  getDraft={getRecommendationDraft}
+                  onDraftChange={setRecommendationDraft}
+                  onSave={saveLearnerRecommendation}
+                  onError={showToast}
+                />
               )}
 
               {activeTab ===

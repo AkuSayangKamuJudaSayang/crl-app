@@ -59,6 +59,7 @@
 @media(min-width:1025px){.teacherHome{align-items:stretch}.teacherHome .overviewBody{flex:1}.teacherHome .metrics{flex:1;grid-auto-rows:minmax(90px,1fr)}.teacherHome .menu{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
 
 @media(min-width:721px){.teacherHome .menu{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1360px){.teacherHome .menu{grid-template-columns:repeat(4,minmax(0,1fr))}.teacherHome .menuCard{padding:18px}}
 
 .teacherHome .metrics>.card:last-child{grid-column:1/-1}
 

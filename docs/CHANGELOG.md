@@ -1,5 +1,33 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-29.1 — Recommendations and Interventions workspace
+
+Date: 29 November 2026, Asia/Manila.
+
+The teacher main menu opens Recommendations and Interventions after
+Assessment Records. Choose a school year and section; the list defaults to
+BoSY Low Emerging Readers. The workspace owns the timeline, reading profile,
+and recommendation-status filters, profile-guided editor, DepEd-informed
+presets, free-text interventions, and filtered Excel export. Archived classes
+can be viewed and exported when available in teacher records.
+
+In Conduct Assessment, the fifth column provides plain recommendation remarks.
+Its period selector chooses where the remark is stored. It does not filter the
+roster. Leaving a changed field saves it through the existing enrollment and
+period API and offline queue. A rejected save keeps the draft available for
+retry. Both views use the same saved recommendations.
+
+Changes cover the teacher page and menu, class workspace UI, remarks field,
+recommendation editor, loader, PWA shell v133, and regression checks. No
+database migration is required. Rolling back the app retains saved remarks.
+Release target is Railway production from GitHub main.
+
+Clean npm install, security audit with zero findings, full regression suite,
+and optimized build passed. Chromium with synthetic classrooms covered 320,
+390, 800, and 1440 px layouts, class selection, all profile and timeline
+controls, editable presets, filtered export, read-only archival access,
+remark error recovery, and offline saving and reconnect replay.
+
 ## CRL-2026-11-28.4 — Inline reading follow-up and filtered reports
 
 Date: 28 November 2026, Asia/Manila.

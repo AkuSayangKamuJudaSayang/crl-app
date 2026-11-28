@@ -15,17 +15,18 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   {id:7,learner_id:2,assessment_period:'EoSY',is_completed:false},
  ];
  const byLearner=periodModel.latestLearnerPeriodResults(results);
- const props={...periodModel,...records,...recommendationModel,followUpPeriod:"BoSY",recommendationEditorRow:null,setRecommendationTarget(){},learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
+ const props={...periodModel,...records,...recommendationModel,remarksPeriod:"BoSY",recommendationKey:row=>row.id,getRecommendationDraft(){},setRecommendationDraft(){},saveLearnerRecommendation(){},LearnerRemarksField:({name,period,value})=>React.createElement("textarea",{"aria-label":period+" recommendation remarks for "+name,defaultValue:value}),Select:({children,...rest})=>React.createElement("select",{...rest,onChange:()=>{}},children),learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
  const Roster=await compile('export default function View(){return ('+page.slice(start,end)+'</div>);}',props);
  const html=renderToStaticMarkup(React.createElement(Roster));
  assert.equal((html.match(/scope="col"/g)||[]).length,5);
  assert.equal((html.match(/scope="row"/g)||[]).length,2);
  assert.equal((html.match(/<td[ >]/g)||[]).length,8);
- for(const label of ['LRN:','Sex:','Recommendations','rosterRecommendationLabel','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
+ for(const label of ['LRN:','Sex:','Recommendation remarks','Remarks period','<textarea','BoSY','MoSY','EoSY','M. Jr.','Female','TEST, SECOND','>Start<','>View<','Low Emerging Reader','Reading At Grade Level','Completed · Sync pending','Incomplete','Not yet assessed'])assert.ok(html.includes(label),label);
  assert.ok(!html.includes('Developing Reader'));
  assert.ok(!html.includes('Delete'));
  assert.match(page,/\.learnerRoster \.rosterIdentity \{\s+position:sticky; left:0;/);
- assert.doesNotMatch(html, /Select all visible learners/);
+ assert.doesNotMatch(html, /Select all visible learners|Reading follow-up|Export follow-up report|Add recommendation|Edit recommendation/);
+ assert.equal((html.match(/<textarea/g)||[]).length,2);
  assert.equal(periodModel.countLearnerMiscues({}),null);
  assert.equal(periodModel.countLearnerMiscues({passage_miscues:[]}).size,0);
  const miscues=periodModel.countLearnerMiscues({passage_miscues:[{miscue_type:'Last Word Read'},{miscue_type:'SelfCorrection'},{miscueType:'Self-correction'},{type:'Omission'}]});

@@ -21,7 +21,7 @@ function Evidence(){return <><Metrics/><div className={styles.evidence}>{[0,1,2]
 export default function DashboardSkeleton({label='Loading workspace…',variant='table',rows=5,announce=true,editable=false,management=false}){
  let content;
  switch(variant){
-  case 'teacher-home':content=<div className={styles.teacherHome}><Overview/><Menu/></div>;break;
+  case 'teacher-home':content=<div className={styles.teacherHome}><Overview/><Menu count={7}/></div>;break;
   case 'teacher-overview':content=<Overview/>;break;
   case 'admin-overview':case 'dashboard':content=<><Metrics/><section className={styles.panel}><Heading/><List rows={3}/></section><section className={styles.panel}><Heading actions={0}/><Fields/><List rows={4}/></section></>;break;
   case 'coordination':content=<><Buttons count={4}/><section className={styles.panel}><Heading actions={0}/><Fields/><List rows={3} avatar boxed/></section></>;break;

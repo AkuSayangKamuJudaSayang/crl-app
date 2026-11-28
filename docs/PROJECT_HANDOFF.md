@@ -1,9 +1,24 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 28 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 29 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Recommendations and Interventions — CRL-2026-11-29.1
+
+This workspace supersedes the Conduct Assessment follow-up toolbar from 28.4.
+Use the existing class chooser to gate the roster. Default to BoSY Low
+Emerging Readers and allow filtering across all assessment periods and
+profiles. Presets, editable guidance and the filtered workbook belong in
+this workspace. Conduct Assessment accepts a remark directly in the roster
+and saves it on field blur for the period selected at the column header.
+
+Keep both surfaces on the same enrollment-scoped recommendation store and
+offline mutation. Failed writes keep their drafts. Apply acknowledgements to
+the edited period so overlapping saves for separate periods preserve each
+other. The capstone can describe an explicit teacher follow-up workflow
+separate from assessment scoring and official records.
 
 ## Inline reading follow-up — CRL-2026-11-28.4
 
