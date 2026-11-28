@@ -1,5 +1,35 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-28.4 — Inline reading follow-up and filtered reports
+
+Date: 28 November 2026, Asia/Manila.
+
+Conduct Assessment adds a Reading follow-up toolbar. The chosen period sets
+the profile filter, recommendation status filter, and Recommendation column.
+The three assessment columns stay visible. Export follow-up report downloads
+an Excel workbook of the filtered roster with the chosen period's assessment
+status, profile and saved teacher recommendation.
+
+The inline editor offers editable suggestions and predefined activities for
+the learner's reading profile, plus free-text entry. Low Emerging examples
+cover letter sounds, oral blending, and guided decoding. Examples draw from
+[DepEd Memorandum 034, s. 2025](https://www.deped.gov.ph/wp-content/uploads/DM_s2025_034.pdf)
+and [DepEd Memorandum 064, s. 2025](https://www.deped.gov.ph/wp-content/uploads/DM_s2025_064r.pdf).
+A recommendation is saved only by teacher action, to one enrollment and period.
+
+Reuses the period recommendation API and offline outbox. No new database
+migration. Official CRLA reports, assessment results and scoresheet remarks
+continue through their existing workflows. PWA app shell v132.
+
+Updated the teacher page, inline recommendation editor, follow-up guidance
+and export modules, service worker, and roster regression checks. Clean npm
+install, zero-finding audit, full regression suite, and optimized build passed.
+Chromium with synthetic records covered 320, 390, 800 and 1440 px, including
+dark theme, filter combinations, independent period saves, filtered Excel
+output, offline export and replay on reconnect. The release targets Railway
+production from GitHub main. Rolling back the app retains saved remarks in
+the existing period recommendation column.
+
 ## CRL-2026-11-28.3 — Full-width roster and period recommendations
 
 Date: 28 November 2026, Asia/Manila.

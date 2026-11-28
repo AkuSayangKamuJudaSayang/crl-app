@@ -15,7 +15,7 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
   {id:7,learner_id:2,assessment_period:'EoSY',is_completed:false},
  ];
  const byLearner=periodModel.latestLearnerPeriodResults(results);
- const props={...periodModel,...records,...recommendationModel,setRecommendationTarget(){},learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
+ const props={...periodModel,...records,...recommendationModel,followUpPeriod:"BoSY",recommendationEditorRow:null,setRecommendationTarget(){},learnerPeriodResults:byLearner,PERIODS:['BoSY','MoSY','EoSY'],periodEligibility:(await import('../lib/classWorkspace.mjs')).periodEligibility,selectedClass:{id:'s',schoolYearId:'y'},setAnalyticsYearId(){},setAnalyticsSectionId(){},selectAnalyticsLearner(){},setAnalyticsMobileResultOpen(){},filteredLearners:[{id:1,lrn:'000000000001',last_name:'SAMPLE',first_name:'LEARNER',middle_name:'M.',suffix:'Jr.',sex:'Female'},{id:2,lrn:'000000000002',lastName:'TEST',firstName:'SECOND',sex:'Male'}],assessments:results,selectedLearnerIds:[1],classReadonly:false,startingAssessment:false,liveTimelineIssue:()=>'',toggleLearnerSelection(){},selectAllFilteredLearners(){},clearLearnerSelection(){}};
  const Roster=await compile('export default function View(){return ('+page.slice(start,end)+'</div>);}',props);
  const html=renderToStaticMarkup(React.createElement(Roster));
  assert.equal((html.match(/scope="col"/g)||[]).length,5);
@@ -59,6 +59,27 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  ]);
  assert.deepEqual(projected[0].period_recommendations,{BoSY:'Original',MoSY:'Local',EoSY:'Pending'});
  assert.equal(projected[1],roster[1]);
+ const followUp=await import('../lib/readingFollowUp.mjs');
+ const low=followUp.readingFollowUpGuidance('Low Emerging Reader');
+ assert.match(low.recommendation,/letter sounds.*blending/);
+ assert.deepEqual(low.interventions.map(([label])=>label),['Letter–sound practice','Oral rhyming and blending','Guided word decoding']);
+ assert.notDeepEqual(followUp.readingFollowUpGuidance('Reading At Grade Level').interventions,low.interventions);
+ assert.equal(followUp.readingFollowUpGuidance('').recommendation,'');
+ const followUpLearner={id:1,lrn:'000000000001',first_name:'Synthetic',last_name:'Learner',period_recommendations:{BoSY:'=1+1'}};
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').BoSY,'BoSY','Low Emerging Reader','with'),true);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').MoSY,'MoSY','Low Emerging Reader','with'),false);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,byLearner.get('1').MoSY,'MoSY','Reading At Grade Level','without'),true);
+ assert.equal(followUp.matchesReadingFollowUp(followUpLearner,undefined,'EoSY','unassessed','without'),true);
+ const {buildReadingFollowUpReport}=await import('../lib/readingFollowUpExport.js');
+ const xlsx=await import('xlsx');
+ const {blob,filename}=await buildReadingFollowUpReport({learners:[followUpLearner],results:byLearner,period:'BoSY',section:'Sample',year:'2026-2027'});
+ const sheet=xlsx.read(await blob.arrayBuffer(),{type:'array'}).Sheets['Reading Follow-Up'];
+ assert.match(filename,/2026-2027_Sample_BoSY\.xlsx$/);
+ assert.equal(sheet.D2.v,'000000000001');
+ assert.equal(sheet.G2.v,'Low Emerging Reader');
+ assert.equal(sheet.H2.v,'=1+1');
+ assert.equal(sheet.H2.f,undefined);
+ assert.equal(sheet['!autofilter'].ref,'A1:H2');
  const route=fs.readFileSync('app/api/assessment/route.js','utf8');
  const saveStart=route.indexOf('    if (action === "save_learner_recommendations")');
  const saveEnd=route.indexOf('    if (action === "reconcile_offline_assessment")',saveStart);

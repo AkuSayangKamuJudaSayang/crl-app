@@ -5,6 +5,20 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Inline reading follow-up — CRL-2026-11-28.4
+
+The Conduct Assessment follow-up period scopes the profile filter, the
+recommendation status filter, the inline recommendation edit, and the
+standalone Excel export. Keep the BoSY, MoSY and EoSY columns visible
+when filtering. A teacher can combine the filters to find, for example,
+MoSY Low Emerging readers without a saved recommendation.
+
+Suggestions and presets are editable classroom examples informed by DepEd
+Memoranda 034 and 064, s. 2025. Teachers can type an intervention before or
+after an assessment. Use the existing scoped enrollment mutation and offline
+outbox, writing only the edited period. Keep the workbook separate from the
+official CRLA report templates and preserve LRN and free text as strings.
+
 ## Period recommendations and full-width roster — CRL-2026-11-28.3
 
 The Conduct Assessment roster uses the available horizontal space, preserves

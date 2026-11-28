@@ -60,10 +60,3 @@
 
 .archiveLearnersForm > p:first-child { margin:0 0 18px; }
 .archiveLearnersForm label > :global([data-crl-select]) { width:100%; }
-
-.recommendationsForm .recommendationLearner { margin:0 0 14px; font-weight:700; overflow-wrap:anywhere; }
-.recommendationPeriods { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
-.recommendationPeriods .button { padding:8px 5px; }
-.recommendationPeriods .button[aria-pressed="true"] { background:#284f7b; border-color:#284f7b; color:#fff; }
-.recommendationsForm label > :global([data-crl-select]) { width:100%; }
-.recommendationsForm textarea { max-height:40vh; }
